@@ -156,8 +156,7 @@ backend ─▶ postgres          (backend, api-externa e postgres não publicam 
 
 ```
 users, invites, api_tokens, audit_log
-institutions (user_id, nome, tipo PF/PJ)
-accounts (user_id, institution_id, nome, tipo, titularidade PF/PJ)
+accounts (user_id, nome, tipo, titularidade PF/PJ, cor)        -- (sem tabela de instituição: a conta já é o banco)
 wallets (user_id, account_id, nome [Livre, VA/VR, Principal], saldo_inicial)   -- saldo da conta = Σ carteiras
 credit_lines (user_id, institution_id, limite, dia_fechamento, dia_vencimento, conta_pagamento_id)
 cards (user_id, nome, formato FISICO/DIGITAL, funcao CREDITO_DEBITO/SO_DEBITO/VOUCHER_ALIMENTACAO,

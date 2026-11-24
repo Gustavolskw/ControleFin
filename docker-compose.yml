@@ -42,8 +42,12 @@ services:
     restart: unless-stopped
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/controlefin
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Dono do banco: só para as migrações (Flyway) na inicialização.
+      DB_OWNER_USER: ${POSTGRES_USER}
+      DB_OWNER_PASSWORD: ${POSTGRES_PASSWORD}
+      # Usuário restrito da aplicação (sujeito ao Row-Level Security).
+      DB_APP_USER: controlefin_app
+      DB_APP_PASSWORD: ${APP_DB_PASSWORD:?defina APP_DB_PASSWORD no .env (./controlefin.sh start cria)}
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       DEFAULT_USER: ${DEFAULT_USER:-controlefin}

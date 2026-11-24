@@ -68,7 +68,12 @@ export class AppComponent {
   menuOpen = signal(false);
 
   links = computed<NavLink[]>(() => {
-    const base: NavLink[] = [{ path: '/painel', label: 'Painel' }];
+    const base: NavLink[] = [
+      { path: '/painel', label: 'Painel' },
+      { path: '/lancamentos', label: 'Lançamentos' },
+      { path: '/contas', label: 'Contas' },
+      { path: '/categorias', label: 'Categorias' },
+    ];
     return this.auth.isAdmin() ? [...base, { path: '/admin', label: 'Administração' }] : base;
   });
 

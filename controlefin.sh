@@ -73,6 +73,8 @@ ensure_env() {
   cat > .env <<EOF
 POSTGRES_USER=controlefin
 POSTGRES_PASSWORD=$(random_secret 24)
+# Usuário restrito que a aplicação usa (sujeito ao Row-Level Security); criado pelo backend.
+APP_DB_PASSWORD=$(random_secret 24)
 JWT_SECRET=$(random_secret 48)
 # Segredo entre a api-externa e o backend (rotas /api/internal, nunca expostas).
 INTERNAL_API_SECRET=$(random_secret 32)
@@ -103,6 +105,19 @@ EOF
   ok ".env criado (guarde este arquivo: sem ele não é possível acessar o banco nem restaurar backups)"
   load_env
   ok "Primeiro acesso: usuário ${DEFAULT_USER}, senha inicial ${DEFAULT_USER_PASSWORD} (troque no primeiro login)"
+}
+
+# Versões novas podem exigir segredos novos: acrescenta ao .env existente só o que faltar (sem mexer no resto).
+ensure_env_keys() {
+  local key value
+  for key in APP_DB_PASSWORD INTERNAL_API_SECRET BACKUP_ENCRYPTION_KEY; do
+    if ! grep -q "^${key}=" .env; then
+      value=$(random_secret 32)
+      umask 077
+      printf '%s=%s\n' "$key" "$value" >> .env
+      info "Adicionado ${key} ao .env"
+    fi
+  done
 }
 
 load_env() {
@@ -142,6 +157,7 @@ wait_until_ready() {
 cmd_start() {
   check_requirements
   ensure_env
+  ensure_env_keys
   load_env
   info "Construindo e subindo os serviços (backend x${BACKEND_REPLICAS:-1})"
   compose up -d --build --remove-orphans --scale "backend=${BACKEND_REPLICAS:-1}"

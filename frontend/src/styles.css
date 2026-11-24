@@ -135,6 +135,26 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible, .icon-btn:focus-v
 textarea { resize: vertical; min-height: 60px; }
 
 .field { margin-bottom: 14px; }
+
+/* Campo de dinheiro: prefixo "R$" fixo dentro do campo. */
+.money { position: relative; display: block; }
+.money::before {
+  content: "R$"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 13px; font-weight: 600; pointer-events: none;
+}
+.money input { padding-left: 34px; font-variant-numeric: tabular-nums; }
+
+/* Botões segmentados (ex.: Despesa | Receita | Transferência) */
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+.segmented button { border: 0; background: var(--surface-2); color: var(--muted); padding: 7px 14px; font: inherit; cursor: pointer; }
+.segmented button + button { border-left: 1px solid var(--border); }
+.segmented button.active { background: var(--brand); color: var(--on-brand); font-weight: 600; }
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-bottom: 14px; }
+.filters .field { margin: 0; min-width: 140px; flex: 1; }
+.filters label { font-size: 12px; color: var(--muted); }
+.money-cell, table.data td.money-cell { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+table.data td.actions .btn + .btn { margin-left: 4px; }
 .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
 .error { background: var(--danger-soft); color: var(--danger); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
 .success { background: var(--ok-soft); color: var(--ok); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }

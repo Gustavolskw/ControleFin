@@ -9,6 +9,26 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 
 > Análise, decisões e roadmap: [`docs/ANALISE.md`](docs/ANALISE.md).
 
+## Telas
+
+| Tela | O que faz |
+|---|---|
+| **Painel** | Saldo total de todas as contas (PF + PJ + benefícios), previsão no fim do mês, receitas/despesas do mês, saldo por conta e por carteira, despesas por categoria. |
+| **Lançamentos** | Receitas, despesas, transferências entre carteiras e ajustes; filtros por mês, conta, tipo, situação, categoria e texto; confirmar pendentes. |
+| **Contas** | Contas (corrente, digital, benefício…) com uma ou mais **carteiras** de saldo próprio (ex.: Wiipo "Livre" e "VA/VR"); ajuste de saldo pelo valor real do banco. |
+| **Categorias** | Categorias de despesa/receita com subcategorias (padrões criados no primeiro acesso). |
+| **Administração** | (só admin) convites e ativação de contas — sem acesso a dados financeiros. |
+| **Meu perfil** | Troca de senha (encerra as outras sessões) e das perguntas de segurança. |
+
+## Regras de cálculo
+
+- **Saldo da carteira** = saldo inicial + receitas − despesas ± ajustes − transferências enviadas + recebidas
+  (só lançamentos **confirmados** com data até hoje). Saldo da conta = soma das carteiras; saldo total = soma das contas.
+- **Transferência** entre carteiras próprias não é receita nem despesa. **Pendente** e **cancelado** não afetam saldo.
+- **Previsão no fim do mês** inclui os lançamentos confirmados com data futura dentro do mês (ex.: assinatura dia 30).
+- **Ajustar saldo**: informe o saldo real; o sistema lança um AJUSTE com a diferença.
+- Dinheiro sempre `NUMERIC(19,2)` / `BigDecimal`, arredondamento bancário (HALF_EVEN).
+
 ## Arquitetura
 
 ```
@@ -32,8 +52,14 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 
 - Login com JWT (mesmo padrão do Chama&Essencia); senhas e respostas de segurança com hash BCrypt; política de
   senha forte (backend `PasswordPolicy.java` e frontend `core/password.ts`).
-- **Dados privados por usuário**: todo acesso a dados usa o id do usuário do token (`CurrentUser`), nunca um id
-  vindo da requisição.
+- **Dados privados por usuário, em duas camadas**:
+  1. aplicação: todo acesso usa o id do usuário do token (`CurrentUser`), nunca um id vindo da requisição;
+  2. banco: **Row-Level Security** do PostgreSQL. A aplicação conecta com o usuário restrito `controlefin_app`
+     (sem superusuário, sem permissão de alterar esquema) e informa o usuário logado em cada transação
+     (`UserScopedTransactionManager`); sem ele nenhuma linha financeira é visível, e o banco recusa gravar
+     dados com o `user_id` de outra pessoa. FKs compostas `(id, user_id)` impedem ligar registros de usuários
+     diferentes. As migrações (Flyway) rodam com o dono do banco e recriam as permissões a cada start
+     (`db/migration/afterMigrate.sql`).
 - **Administrador padrão** (`DEFAULT_USER`, padrão `controlefin`): criado no primeiro start com a senha
   `DEFAULT_USER_PASSWORD` do `.env`. No primeiro login o sistema (frontend **e** backend) só libera o perfil até
   **trocar a senha** e **cadastrar as 3 perguntas de segurança**.
@@ -80,7 +106,7 @@ Backup diário: `0 3 * * * cd /caminho/controlefin && ./controlefin.sh backup >>
 
 ```bash
 docker compose up -d postgres     # exige o .env (copie de .env.example)
-cd backend && mvn spring-boot:run  # DB_URL/DB_USER/DB_PASSWORD se diferentes do padrão
+cd backend && mvn spring-boot:run  # DB_OWNER_PASSWORD (=POSTGRES_PASSWORD) e DB_APP_PASSWORD (=APP_DB_PASSWORD)
 cd frontend && npm install && npm start    # http://localhost:4200, proxy /api -> 8080
 ```
 
@@ -96,9 +122,10 @@ services:
 ## Estrutura
 
 ```
-backend/       auth (login, convites, perguntas) · admin · user · config (JWT, filtros, segurança) · db/migration (Flyway)
+backend/       auth (login, convites, perguntas) · admin · user · finance (contas, carteiras, categorias, lançamentos,
+               painel) · config (JWT, filtros, RLS) · db/migration (Flyway)
 external-api/  API pública para o MCP (sem banco)
-frontend/      pages/ login, cadastro, recuperação, perfil, painel, administração
+frontend/      pages/ painel, lançamentos, contas, categorias, perfil, administração, login/cadastro/recuperação
 docker/nginx/  gateway (TLS, rate limit, bloqueio de /api/internal, headers de segurança)
 docs/          análise e decisões
 ```
