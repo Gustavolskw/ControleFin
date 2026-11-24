@@ -1,0 +1,13 @@
+.env
+backups/
+backend/target/
+external-api/target/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Extratos, faturas e planilhas reais usados em testes ficam fora do repositório.
+EXEMPLO/
+
+# Cópia local do banco de produção (script, acessos, senhas e backups): nunca vai para o git.
+PROD/

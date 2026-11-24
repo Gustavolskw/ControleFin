@@ -1,0 +1,17 @@
+server:
+  port: 8081
+  forward-headers-strategy: native
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  application:
+    name: controlefin-external-api
+
+app:
+  backend:
+    # Backend na rede interna do Docker (nunca exposto). Em dev: http://localhost:8080
+    url: ${BACKEND_URL:http://localhost:8080}
+    # Mesmo valor do backend (INTERNAL_API_SECRET): prova que a chamada veio desta API.
+    internal-secret: ${INTERNAL_API_SECRET:}

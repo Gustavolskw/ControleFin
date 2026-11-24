@@ -1,0 +1,38 @@
+# Override para publicar atrás de um Traefik já rodando no servidor
+# (mesmo padrão do Chama&Essencia: rede externa compartilhada "proxy").
+#
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+#   (o controlefin.sh faz isso sozinho quando TRAEFIK_ENABLED=true no .env)
+#
+# O Traefik cuida do domínio e do certificado (Let's Encrypt) e encaminha HTTP para o nginx na porta 80.
+
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:-proxy}
+
+services:
+  nginx:
+    # Quem recebe 80/443 é o Traefik; o gateway não publica portas no host.
+    ports: !reset []
+    networks:
+      - edge
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy}"
+      - "traefik.http.services.controlefin.loadbalancer.server.port=80"
+
+      # HTTPS - domínio do sistema
+      - "traefik.http.routers.controlefin.rule=Host(`${APP_DOMAIN:?defina APP_DOMAIN no .env}`)"
+      - "traefik.http.routers.controlefin.entrypoints=${TRAEFIK_ENTRYPOINT_HTTPS:-websecure}"
+      - "traefik.http.routers.controlefin.tls=true"
+      - "traefik.http.routers.controlefin.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.controlefin.service=controlefin"
+
+      # HTTP -> HTTPS
+      - "traefik.http.routers.controlefin-http.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.controlefin-http.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-web}"
+      - "traefik.http.routers.controlefin-http.middlewares=controlefin-redirect-https"
+      - "traefik.http.middlewares.controlefin-redirect-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.controlefin-redirect-https.redirectscheme.permanent=true"

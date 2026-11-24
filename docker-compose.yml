@@ -1,0 +1,96 @@
+# Somente o gateway (nginx) publica portas; postgres, backend, external-api e frontend ficam em redes internas.
+# Atrás de um Traefik, use também docker-compose.traefik.yml (TRAEFIK_ENABLED=true no .env).
+# Não defina "name:" aqui: o nome do projeto (pasta) compõe o nome dos volumes com os dados.
+#
+# Redes:
+#   edge  -> nginx, frontend, backend, external-api  (tráfego HTTP)
+#   data  -> backend, postgres                         (só o backend enxerga o banco; "internal" = sem saída)
+
+volumes:
+  pg-data:
+  nginx-certs:
+
+networks:
+  edge:
+    driver: bridge
+  data:
+    driver: bridge
+    internal: true
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: controlefin
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: UTC
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d controlefin"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - data
+
+  # Sem container_name para permitir réplicas: docker compose up --scale backend=N
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/controlefin
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
+      DEFAULT_USER: ${DEFAULT_USER:-controlefin}
+      DEFAULT_USER_PASSWORD: ${DEFAULT_USER_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - edge
+      - data
+
+  # API externa (MCP): sem banco; fala com o backend em /api/internal pela rede "edge".
+  external-api:
+    build: ./external-api
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8080
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
+    depends_on:
+      - backend
+    networks:
+      - edge
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    networks:
+      - edge
+
+  nginx:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    container_name: nginx-controlefin
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8091}:80"
+      - "${HTTPS_PORT:-8454}:443"
+    volumes:
+      - nginx-certs:/etc/nginx/certs
+    environment:
+      - NGINX_SELF_SIGNED_CERT_SUBJECT=${NGINX_SELF_SIGNED_CERT_SUBJECT:-/CN=localhost}
+      - NGINX_SELF_SIGNED_CERT_SAN=${NGINX_SELF_SIGNED_CERT_SAN:-DNS:localhost}
+      - NGINX_FORCE_HTTPS=${NGINX_FORCE_HTTPS:-false}
+    depends_on:
+      - backend
+      - external-api
+      - frontend
+    networks:
+      - edge
