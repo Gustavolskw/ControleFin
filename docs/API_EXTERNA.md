@@ -1,6 +1,6 @@
 # API externa do ControleFin (para o Claude / MCP)
 
-Base: `https://controlefin.<seu-dominio>/ext/v1` (local: `http://localhost:8091/ext/v1`).
+Base: `https://controlefin.gkodex.cloud/ext/v1` (local: `http://localhost:8091/ext/v1`).
 
 - **Autenticação:** `Authorization: Bearer cf_...`, um token pessoal criado no site em **Meu perfil → Acesso do Claude**.
   - O token aparece uma única vez.

@@ -1,7 +1,7 @@
 /** Configuração vinda do ambiente (docker-compose / .env). */
 export interface Config {
   port: number;
-  /** URL pública do sistema (ex.: https://controlefin.seudominio.com). O MCP fica em <publicUrl>/mcp. */
+  /** URL pública do sistema (ex.: https://controlefin.gkodex.cloud). O MCP fica em <publicUrl>/mcp. */
   publicUrl: string;
   /** API externa na rede interna do Docker (o MCP só fala com ela). */
   externalApiUrl: string;

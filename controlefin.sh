@@ -100,7 +100,7 @@ BACKEND_REPLICAS=1
 
 # Traefik (veja o README): true = o Traefik do servidor encaminha APP_DOMAIN para o gateway
 TRAEFIK_ENABLED=false
-APP_DOMAIN=
+APP_DOMAIN=controlefin.gkodex.cloud
 TRAEFIK_NETWORK=proxy
 TRAEFIK_CERTRESOLVER=letsencrypt
 TRAEFIK_ENTRYPOINT_HTTPS=websecure

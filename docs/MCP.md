@@ -6,19 +6,19 @@ Com o conector, você fala com o Claude, no celular ou no computador, e ele cons
 - "importa essa fatura em modo analisar"
 - "cancela a compra do tênis"
 
-Fluxo: **Claude → `https://controlefin.<seu-dominio>/mcp` (servidor MCP) → API externa → backend**. O servidor MCP só conversa com a API externa e não tem banco.
+Fluxo: **Claude → `https://controlefin.gkodex.cloud/mcp` (servidor MCP) → API externa → backend**. O servidor MCP só conversa com a API externa e não tem banco.
 
 ## Como conectar (uma vez)
 
 1. **Publique o sistema com HTTPS.** O Claude só se conecta a um endereço público com HTTPS. Isso é o Traefik, com
-   `TRAEFIK_ENABLED=true` e `APP_DOMAIN=controlefin.<seu-dominio>` no `.env`, e depois `./controlefin.sh start`.
-   O endereço do conector passa a ser `https://controlefin.<seu-dominio>/mcp`.
+   `TRAEFIK_ENABLED=true` e `APP_DOMAIN=controlefin.gkodex.cloud` no `.env`, e depois `./controlefin.sh start`.
+   O endereço do conector passa a ser `https://controlefin.gkodex.cloud/mcp`.
    - Atrás de outro proxy, defina `MCP_PUBLIC_URL=https://...` no `.env`.
 2. **Crie um token no site:** **Meu perfil → Acesso do Claude → Criar token**.
    - Escolha "Ler e lançar" ou "Só consultar" e a validade.
    - Copie o token: ele aparece uma vez só.
 3. **No Claude (claude.ai):** **Configurações → Conectores → Adicionar conector personalizado**.
-   - **URL:** `https://controlefin.<seu-dominio>/mcp`.
+   - **URL:** `https://controlefin.gkodex.cloud/mcp`.
    - Deixe os campos de OAuth (Client ID/Secret) **vazios**: o Claude se registra sozinho (DCR).
 4. **Clique em Conectar.** Abre a tela do ControleFin: cole o token e toque em **Autorizar**.
    - Pronto: o conector também aparece no app do celular, porque a conta é a mesma.
@@ -100,8 +100,8 @@ O Claude enxerga o print ou o PDF que você manda, mas o protocolo MCP não deix
 ## Testar sem o Claude
 
 ```bash
-curl -s https://controlefin.<seu-dominio>/.well-known/oauth-protected-resource
-curl -s -X POST https://controlefin.<seu-dominio>/mcp -o /dev/null -w "%{http_code}\n"   # 401 = protegido
+curl -s https://controlefin.gkodex.cloud/.well-known/oauth-protected-resource
+curl -s -X POST https://controlefin.gkodex.cloud/mcp -o /dev/null -w "%{http_code}\n"   # 401 = protegido
 ```
 
 O MCP Inspector (`npx @modelcontextprotocol/inspector`) também se conecta pelo mesmo OAuth.

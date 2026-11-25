@@ -115,8 +115,8 @@ chmod +x controlefin.sh
 
 Atrás do Traefik (recomendado, compartilhado com os outros sistemas):
 
-1. DNS: registro **A** de `controlefin.<seu-dominio>` para o IP da VPS.
-2. No `.env`: `TRAEFIK_ENABLED=true`, `APP_DOMAIN=controlefin.<seu-dominio>` e a mesma `TRAEFIK_NETWORK` /
+1. DNS: registro **A** de `controlefin.gkodex.cloud` para o IP da VPS.
+2. No `.env`: `TRAEFIK_ENABLED=true`, `APP_DOMAIN=controlefin.gkodex.cloud` e a mesma `TRAEFIK_NETWORK` /
    `TRAEFIK_CERTRESOLVER` dos outros sistemas.
 3. `./controlefin.sh start`.
 

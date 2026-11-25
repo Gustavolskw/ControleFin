@@ -103,7 +103,7 @@ backend ─▶ postgres          (backend, api-externa e postgres não publicam 
 - A **api-externa não tem login, cadastro nem nada de usuário**, como você pediu. Ela só repassa o **token pessoal**
   ao backend, que valida o token e descobre o usuário. O backend continua sendo a única autoridade. Assim, mesmo que
   a api-externa seja comprometida, ela não consegue "escolher" o usuário.
-- Domínio: `controlefin.<seu-dominio>` (DNS é minúsculo). A API externa no mesmo host, em `/ext/v1`, evita outro DNS
+- Domínio: `controlefin.gkodex.cloud` (DNS é minúsculo). A API externa no mesmo host, em `/ext/v1`, evita outro DNS
   e outro certificado. Se preferir, dá para usar um host separado (`api-controlefin.`).
 
 ### 3.2 Token de API (para o MCP)
