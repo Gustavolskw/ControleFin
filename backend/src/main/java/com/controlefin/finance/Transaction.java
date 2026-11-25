@@ -100,6 +100,10 @@ public class Transaction {
     @Column(name = "recurrence_date")
     private LocalDate recurrenceDate;
 
+    /** Lote de importação (Claude) que criou este lançamento. */
+    @Column(name = "import_batch_id")
+    private UUID importBatchId;
+
     /** Estorno: compra original. */
     @Column(name = "reversal_of")
     private UUID reversalOf;
@@ -172,6 +176,8 @@ public class Transaction {
         this.recurrenceId = recurrenceId;
         this.recurrenceDate = recurrenceId == null ? null : recurrenceDate;
     }
+    public UUID getImportBatchId() { return importBatchId; }
+    public void setImportBatchId(UUID importBatchId) { this.importBatchId = importBatchId; }
     public UUID getReversalOf() { return reversalOf; }
     public void setReversalOf(UUID reversalOf) { this.reversalOf = reversalOf; }
     public boolean isCredit() { return invoiceId != null && kind != FinanceEnums.TransactionKind.PAGAMENTO_FATURA; }

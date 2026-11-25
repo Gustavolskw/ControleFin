@@ -5,7 +5,7 @@ import { ApiService } from '../core/api.service';
 import { errorMessage } from '../core/auth.interceptor';
 import { BrlPipe, DateBrPipe, MonthBrPipe, currentMonth, isoDate, monthRange } from '../core/format';
 import {
-  BankAccount, Card, Category, KIND_LABEL, STATUS_LABEL, Transaction, TransactionKind, TransactionRequest,
+  Attachment, BankAccount, Card, Category, KIND_LABEL, STATUS_LABEL, Transaction, TransactionKind, TransactionRequest,
   TransactionStatus,
 } from '../core/models';
 import { MonthPickerComponent } from '../shared/month-picker.component';
@@ -291,7 +291,23 @@ interface CategoryGroup { parent: Category; children: Category[]; }
             <label for="tn">Observações</label>
             <textarea id="tn" name="tn" [(ngModel)]="f.notes" maxlength="1000" rows="2"></textarea>
           </div>
+          @if (f.id) {
+            <div class="files">
+              <span class="label">Anexos</span>
+              @for (a of files(); track a.id) {
+                <button class="btn ghost small" type="button" (click)="api.downloadAttachment(a)" [title]="a.mimeType">⭳ {{ a.name }}</button>
+              } @empty {
+                <span class="muted small">Nenhum.</span>
+              }
+              <label class="btn ghost small upload">+ Anexar
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.csv,.txt,.ofx,.xls,.xlsx" (change)="attach(f, $event)" hidden>
+              </label>
+            </div>
+          }
           @if (f.id && editing(); as t) {
+            @if (t.importBatchId) {
+              <p class="hint">Enviado pelo Claude · <a routerLink="/importacoes" [queryParams]="{ lote: t.importBatchId }">ver importação</a></p>
+            }
             @if (t.invoiceId && t.creditLineId) {
               <p class="hint">Na fatura de {{ t.invoiceReference | monthBr }} ·
                 <a [routerLink]="['/cartoes', t.creditLineId, 'faturas']" [queryParams]="{ fatura: t.invoiceId }">ver fatura</a></p>
@@ -323,6 +339,10 @@ interface CategoryGroup { parent: Category; children: Category[]; }
     .foreign .field { min-width: 110px; }
     button.link { background: none; border: 0; padding: 2px 0; color: var(--accent); cursor: pointer; font-size: 12px; }
     .warning { margin-bottom: 12px; }
+    .files { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 10px; }
+    .files .label { margin-right: 4px; }
+    .upload { cursor: pointer; }
+    .small { font-size: 12px; }
     @media (max-width: 700px) {
       .wide { display: none; }
       .meta { display: block; }
@@ -333,7 +353,7 @@ interface CategoryGroup { parent: Category; children: Category[]; }
   `,
 })
 export class TransactionsComponent implements OnInit {
-  private api = inject(ApiService);
+  api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -361,6 +381,7 @@ export class TransactionsComponent implements OnInit {
   busy = signal(false);
   form = signal<TxForm | null>(null);
   editing = signal<Transaction | null>(null);
+  files = signal<Attachment[]>([]);
 
   totals = computed(() => {
     let income = 0, expense = 0;
@@ -401,6 +422,9 @@ export class TransactionsComponent implements OnInit {
     this.accountId = p.get('accountId') ?? '';
     this.cardId = p.get('cardId') ?? '';
     this.status = (p.get('status') as TransactionStatus | null) ?? '';
+    this.q = p.get('q') ?? '';
+    const mes = p.get('mes');
+    if (mes && /^\d{4}-\d{2}$/.test(mes)) this.month.set(mes);
     const novo = p.get('novo');
     this.api.accounts().subscribe({ next: a => this.accounts.set(a), error: e => this.error.set(errorMessage(e)) });
     this.api.categories().subscribe({ next: c => this.categories.set(c), error: e => this.error.set(errorMessage(e)) });
@@ -495,6 +519,8 @@ export class TransactionsComponent implements OnInit {
   editTx(t: Transaction): void {
     this.formError.set('');
     this.editing.set(t);
+    this.files.set([]);
+    this.api.transactionAttachments(t.id).subscribe({ next: a => this.files.set(a), error: () => this.files.set([]) });
     let payWith = t.walletId ? 'w:' + t.walletId : '';
     if (t.cardId && t.kind !== 'PAGAMENTO_FATURA') payWith = `c:${t.cardId}:${t.invoiceId ? 'c' : 'd'}`;
     const group = !!t.installmentGroup;
@@ -622,6 +648,18 @@ export class TransactionsComponent implements OnInit {
     f.status = 'CONFIRMADO';
     this.api.updateTransaction(t.id, this.toRequest(f))
       .subscribe({ next: () => this.load(), error: e => this.error.set(errorMessage(e)) });
+  }
+
+  attach(f: TxForm, ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!f.id || !file) return;
+    if (file.size > 10 * 1024 * 1024) return this.formError.set('Arquivo maior que 10 MB.');
+    this.api.uploadAttachment(f.id, file).subscribe({
+      next: a => this.files.update(list => list.some(x => x.id === a.id) ? list : [...list, a]),
+      error: e => this.formError.set(errorMessage(e)),
+    });
   }
 
   reverse(f: TxForm): void {

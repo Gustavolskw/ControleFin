@@ -152,6 +152,7 @@ export interface Transaction {
   reversalOf: string | null;
   recurrenceId: string | null;
   recurrenceDate: string | null;
+  importBatchId: string | null;
 }
 
 export interface TransactionRequest {
@@ -418,4 +419,85 @@ export interface InviteInfo {
   usedAt: string | null;
   revokedAt: string | null;
   status: InviteStatus;
+}
+
+// ------------------------------------------------------------------ tokens de API, importações e anexos
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  prefix: string;
+  canWrite: boolean;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  active: boolean;
+  /** Só vem na criação. */
+  token: string | null;
+}
+
+export interface ActivityEntry {
+  id: string;
+  at: string;
+  source: 'WEB' | 'API';
+  tokenName: string | null;
+  action: string;
+  entityId: string | null;
+  details: string | null;
+}
+
+export const ACTIVITY_LABEL: Record<string, string> = {
+  TOKEN_CRIADO: 'Token criado', TOKEN_REVOGADO: 'Token revogado', IMPORTACAO: 'Importação',
+  IMPORTACAO_CONFIRMADA: 'Importação confirmada', IMPORTACAO_DESFEITA: 'Importação desfeita',
+  LANCAMENTO_EDITADO: 'Lançamento editado', LANCAMENTO_CONFIRMADO: 'Lançamento confirmado',
+  LANCAMENTO_ESTORNADO: 'Lançamento estornado',
+};
+
+export interface Attachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  sha256: string;
+  createdAt: string;
+}
+
+export type ImportMode = 'ANALISAR' | 'CONFIRMADO' | 'REMOVER';
+export type ImportItemStatus = 'CRIADO' | 'PENDENTE' | 'DUPLICADO' | 'ERRO' | 'REMOVIDO' | 'ESTORNADO' | 'DESFEITO';
+
+export const IMPORT_MODE_LABEL: Record<ImportMode, string> = {
+  ANALISAR: 'Analisar', CONFIRMADO: 'Confirmado', REMOVER: 'Remover',
+};
+export const IMPORT_ITEM_LABEL: Record<ImportItemStatus, string> = {
+  CRIADO: 'Lançado', PENDENTE: 'Pendente', DUPLICADO: 'Duplicado (ignorado)', ERRO: 'Erro', REMOVIDO: 'Cancelado',
+  ESTORNADO: 'Estornado', DESFEITO: 'Desfeito',
+};
+
+export interface ImportItemResult {
+  position: number;
+  status: ImportItemStatus;
+  transactionId: string | null;
+  date: string | null;
+  description: string | null;
+  amount: number | null;
+  message: string | null;
+}
+
+export interface ImportBatch {
+  id: string;
+  mode: ImportMode;
+  note: string | null;
+  status: 'PROCESSADO' | 'DESFEITO';
+  createdAt: string;
+  undoneAt: string | null;
+  tokenName: string | null;
+  replayed: boolean;
+  created: number;
+  pending: number;
+  duplicates: number;
+  errors: number;
+  removed: number;
+  items: ImportItemResult[];
+  attachments: Attachment[];
 }

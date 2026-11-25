@@ -19,9 +19,10 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 | **Cartões** | Cartões de crédito (limite compartilhado pelos cartões físico e digitais, fechamento e vencimento), débito e voucher alimentação; limite usado/disponível; fatura aberta e fatura a pagar. |
 | **Faturas** | Fatura por mês: compras, parcelas, estornos e pagamentos; pagar (parcial ou total) e estornar compras. |
 | **Recorrências** | Assinaturas, aluguel, salário (mensal, anual ou semanal): previsto × realizado no mês, lançar cada ocorrência uma única vez, pular, vincular um lançamento já feito; aviso de possível duplicado. |
+| **Importações** | Lotes enviados pelo Claude: lançados, pendentes (modo Analisar), duplicados ignorados, erros e arquivos enviados; confirmar pendentes ou desfazer a importação. |
 | **Categorias** | Categorias de despesa/receita com subcategorias (padrões criados no primeiro acesso). |
 | **Administração** | (só admin) convites e ativação de contas — sem acesso a dados financeiros. |
-| **Meu perfil** | Troca de senha (encerra as outras sessões) e das perguntas de segurança. |
+| **Meu perfil** | Troca de senha (encerra as outras sessões) e das perguntas de segurança; **Acesso do Claude**: tokens da API externa (criar, validade, só leitura, revogar) e atividade recente (site e Claude). |
 
 ## Regras de cálculo
 
@@ -65,6 +66,7 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 - **external-api**: API pública para o MCP. Sem banco e sem nada de login/cadastro/usuário; repassa o token pessoal
   ao backend, que valida e resolve o usuário.
 - O gateway sempre apaga o header `X-Internal-Secret` vindo de fora e responde 404 para `/api/internal/`.
+- Contrato da API externa (rotas, importação, modos, anexos): [`docs/API_EXTERNA.md`](docs/API_EXTERNA.md).
 
 ## Segurança
 
@@ -88,7 +90,16 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 - Trocar/redefinir a senha **encerra todas as sessões** (versão do token); desativar um usuário também.
 - 5 tentativas erradas de login/recuperação bloqueiam a conta por 15 min; o nginx limita `/api/auth/` a 10/min por IP.
 - Headers: CSP restritiva (fontes servidas localmente, sem script inline), HSTS em HTTPS, `X-Frame-Options: DENY`.
-- Backups criptografados (AES-256, chave `BACKUP_ENCRYPTION_KEY` do `.env`).
+- **API externa (Claude)**:
+  - token pessoal (`cf_…`) guardado só como hash, com validade, escopo leitura/escrita e revogação imediata;
+  - o backend valida o token em toda chamada;
+  - a recuperação de senha revoga todos os tokens;
+  - tudo fica no registro de atividade.
+- **Anexos** (prints, PDFs, CSV, Excel):
+  - criptografados no disco com AES-256-GCM (chave `ATTACHMENTS_KEY`);
+  - tipo conferido pelo conteúdo;
+  - entregues sempre como download.
+- Backups criptografados (AES-256, chave `BACKUP_ENCRYPTION_KEY` do `.env`): banco e anexos.
 
 ## Produção (mesmo servidor do Chama&Essencia, outro subdomínio)
 
@@ -113,12 +124,13 @@ volume `<pasta>_pg-data`. No modo standalone (sem Traefik) o gateway publica `80
 | `./controlefin.sh start` / `stop` / `restart` / `status` | Sobe, para, reinicia, mostra estado |
 | `./controlefin.sh logs [nginx\|backend\|external-api\|frontend\|postgres]` | Logs |
 | `./controlefin.sh update` | backup + `git pull` + rebuild (as migrações do banco rodam sozinhas) |
-| `./controlefin.sh backup` | `backups/controlefin-AAAAMMDD-HHMMSS.dump.enc` (criptografado) |
+| `./controlefin.sh backup` | `backups/controlefin-AAAAMMDD-HHMMSS.dump.enc` + `.anexos.tar.enc` (criptografados) |
 | `./controlefin.sh restore <arquivo>` | Restaura um backup (substitui os dados) |
 
 Backup diário: `0 3 * * * cd /caminho/controlefin && ./controlefin.sh backup >> backups/cron.log 2>&1`
 
-> Guarde o `.env` (principalmente `BACKUP_ENCRYPTION_KEY`) fora do servidor: sem ele os backups não abrem.
+> Guarde o `.env` (principalmente `BACKUP_ENCRYPTION_KEY` e `ATTACHMENTS_KEY`) fora do servidor: sem ele os backups e
+> os anexos não abrem.
 
 ## Desenvolvimento local
 
@@ -140,10 +152,10 @@ services:
 ## Estrutura
 
 ```
-backend/       auth (login, convites, perguntas) · admin · user · finance (contas, carteiras, categorias, lançamentos,
-               cartões, faturas, recorrências, painel) · config (JWT, filtros, RLS) · db/migration (Flyway)
-external-api/  API pública para o MCP (sem banco)
-frontend/      pages/ painel, lançamentos, contas, cartões, faturas, recorrências, categorias, perfil, administração, login/cadastro/recuperação
+backend/       auth (login, convites, perguntas) · admin · user · apitoken (tokens do Claude) · audit · finance (contas, carteiras, categorias, lançamentos,
+               cartões, faturas, recorrências, importações, anexos, painel, rotas internas) · config (JWT, filtros, RLS) · db/migration (Flyway)
+external-api/  API pública para o MCP (sem banco; repasse com lista fechada de rotas)
+frontend/      pages/ painel, lançamentos, contas, cartões, faturas, recorrências, importações, categorias, perfil, administração, login/cadastro/recuperação
 docker/nginx/  gateway (TLS, rate limit, bloqueio de /api/internal, headers de segurança)
 docs/          análise e decisões
 ```

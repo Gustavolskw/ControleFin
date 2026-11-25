@@ -9,11 +9,12 @@ import { passwordValid } from '../core/password';
 import { PasswordInputComponent } from '../shared/password-input.component';
 import { PasswordRulesComponent } from '../shared/password-rules.component';
 import { SecurityQuestionsComponent, emptyQuestions, questionsValid } from '../shared/security-questions.component';
+import { ApiAccessComponent } from '../shared/api-access.component';
 
 /** Perfil: troca de senha e das perguntas de segurança, sempre confirmando a senha atual. */
 @Component({
   selector: 'app-profile',
-  imports: [FormsModule, RouterLink, SecurityQuestionsComponent, PasswordInputComponent, PasswordRulesComponent],
+  imports: [FormsModule, RouterLink, SecurityQuestionsComponent, PasswordInputComponent, PasswordRulesComponent, ApiAccessComponent],
   template: `
     <div class="page-head">
       <h1>Meu perfil</h1>
@@ -89,6 +90,10 @@ import { SecurityQuestionsComponent, emptyQuestions, questionsValid } from '../s
         }
       </section>
     </div>
+
+    @if (account(); as a) {
+      @if (!a.setupRequired) { <app-api-access /> }
+    }
   `,
   styles: `
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }

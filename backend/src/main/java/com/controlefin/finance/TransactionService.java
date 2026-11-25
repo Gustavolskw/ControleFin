@@ -311,6 +311,33 @@ public class TransactionService {
                 .limit(10).map(t -> toResponse(t, names)).toList();
     }
 
+    /** Linhas do lançamento: a própria ou todas as parcelas da compra. */
+    List<Transaction> rows(UUID userId, Transaction t) {
+        return t.getInstallmentGroup() == null ? List.of(t) : group(userId, t);
+    }
+
+    /** Muda a situação do lançamento (em compra parcelada, de todas as parcelas). */
+    @Transactional
+    public TransactionResponse setStatus(UUID userId, UUID id, TransactionStatus status) {
+        Transaction t = transaction(userId, id);
+        for (Transaction r : rows(userId, t)) {
+            r.setStatus(status);
+            r.touch();
+        }
+        transactions.flush();
+        return toResponse(t, names(userId));
+    }
+
+    /** Confirma um lançamento pendente (ex.: enviado pelo Claude no modo ANALISAR). */
+    @Transactional
+    public TransactionResponse confirm(UUID userId, UUID id) {
+        Transaction t = transaction(userId, id);
+        if (t.getStatus() == TransactionStatus.CANCELADO) {
+            throw ApiException.badRequest("Lançamento cancelado não pode ser confirmado.");
+        }
+        return setStatus(userId, id, TransactionStatus.CONFIRMADO);
+    }
+
     Transaction transaction(UUID userId, UUID id) {
         return transactions.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> ApiException.notFound("Lançamento não encontrado."));
@@ -560,6 +587,6 @@ public class TransactionService {
                 t.getInvoiceId(), inv == null ? null : inv.getReference().toString(), t.isConsumesLimit(),
                 t.getInstallmentGroup(), t.getInstallmentNumber(), t.getInstallmentCount(),
                 t.getOriginalCurrency(), t.getOriginalAmount(), t.getExchangeRate(), t.getIof(), t.getReversalOf(),
-                t.getRecurrenceId(), t.getRecurrenceDate());
+                t.getRecurrenceId(), t.getRecurrenceDate(), t.getImportBatchId());
     }
 }

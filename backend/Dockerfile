@@ -10,7 +10,8 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 ENV TZ=America/Sao_Paulo
 # Não roda como root dentro do container.
-RUN useradd --system --uid 10001 app
+RUN useradd --system --uid 10001 app \
+    && mkdir -p /data/attachments && chown app /data/attachments && chmod 700 /data/attachments
 COPY --from=build /app/target/controlefin-backend-*.jar app.jar
 USER app
 EXPOSE 8080

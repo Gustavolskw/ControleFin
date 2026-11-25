@@ -5,6 +5,7 @@ import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -19,7 +20,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter,
-                                           InternalApiFilter internalApiFilter) throws Exception {
+                                           InternalApiFilter internalApiFilter, ApiTokenFilter apiTokenFilter)
+            throws Exception {
         return http
                 // API stateless com token no header Authorization (sem cookie de sessão): CSRF não se aplica.
                 .csrf(csrf -> csrf.disable())
@@ -32,6 +34,9 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // API externa (Claude/MCP): token pessoal; leitura com ROLE_API, escrita exige SCOPE_WRITE.
+                        .requestMatchers(HttpMethod.GET, "/api/internal/**").hasRole("API")
+                        .requestMatchers("/api/internal/**").hasAuthority("SCOPE_WRITE")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e
@@ -43,6 +48,7 @@ public class SecurityConfig {
                             res.getWriter().write("{\"message\":\"Acesso negado.\"}");
                         }))
                 .addFilterBefore(internalApiFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(apiTokenFilter, InternalApiFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -58,6 +64,13 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<InternalApiFilter> internalFilterRegistration(InternalApiFilter filter) {
         FilterRegistrationBean<InternalApiFilter> reg = new FilterRegistrationBean<>(filter);
+        reg.setEnabled(false);
+        return reg;
+    }
+
+    @Bean
+    public FilterRegistrationBean<ApiTokenFilter> apiTokenFilterRegistration(ApiTokenFilter filter) {
+        FilterRegistrationBean<ApiTokenFilter> reg = new FilterRegistrationBean<>(filter);
         reg.setEnabled(false);
         return reg;
     }

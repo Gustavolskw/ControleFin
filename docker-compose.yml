@@ -9,6 +9,8 @@
 volumes:
   pg-data:
   nginx-certs:
+  # Anexos (prints, PDFs, planilhas) já criptografados pelo backend (AES-256-GCM, chave ATTACHMENTS_KEY).
+  attachments:
 
 networks:
   edge:
@@ -52,6 +54,10 @@ services:
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       DEFAULT_USER: ${DEFAULT_USER:-controlefin}
       DEFAULT_USER_PASSWORD: ${DEFAULT_USER_PASSWORD:-}
+      ATTACHMENTS_DIR: /data/attachments
+      ATTACHMENTS_KEY: ${ATTACHMENTS_KEY:?defina ATTACHMENTS_KEY no .env (./controlefin.sh start cria)}
+    volumes:
+      - attachments:/data/attachments
     depends_on:
       postgres:
         condition: service_healthy

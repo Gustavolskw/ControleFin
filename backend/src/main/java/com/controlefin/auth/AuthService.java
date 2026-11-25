@@ -45,6 +45,13 @@ public class AuthService {
     /** Hash usado quando o usuário não existe, para o tempo de resposta não revelar quais usuários existem. */
     private final String dummyHash;
 
+    private com.controlefin.apitoken.ApiTokenRepository apiTokens;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setApiTokens(com.controlefin.apitoken.ApiTokenRepository apiTokens) {
+        this.apiTokens = apiTokens;
+    }
+
     public AuthService(UserRepository users, PasswordEncoder encoder, JwtService jwt, InviteService invites,
                        @Value("${app.security.max-failed-attempts}") int maxFailedAttempts,
                        @Value("${app.security.lock-minutes}") long lockMinutes) {
@@ -135,6 +142,8 @@ public class AuthService {
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
         user.invalidateTokens();
+        // Recuperação de senha pode indicar conta comprometida: revoga também os tokens de API (Claude).
+        if (apiTokens != null) apiTokens.revokeAll(user.getId());
     }
 
     @Transactional(readOnly = true)

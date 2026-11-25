@@ -143,7 +143,7 @@ public final class FinanceDtos {
                                       UUID installmentGroup, Integer installmentNumber, Integer installmentCount,
                                       String originalCurrency, BigDecimal originalAmount, BigDecimal exchangeRate,
                                       BigDecimal iof, UUID reversalOf, UUID recurrenceId,
-                                      LocalDate recurrenceDate) {
+                                      LocalDate recurrenceDate, UUID importBatchId) {
     }
 
     public record TransactionFilter(LocalDate from, LocalDate to, UUID accountId, UUID walletId, UUID categoryId,

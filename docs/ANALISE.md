@@ -179,7 +179,7 @@ import_batches (user_id, origem, token_id, status, criado_em, resumo)
 
 ## 7. Fases sugeridas
 
-Situação: fases 0, 1, 2 e 3 **concluídas**.
+Situação: fases 0 a 4 **concluídas**. Contrato da API externa: [`API_EXTERNA.md`](API_EXTERNA.md).
 
 0. **Infra + Auth:** monorepo, compose (postgres, backend, frontend, nginx, traefik), `controlefin.sh`,
    login/convite/perguntas/primeiro acesso/bloqueio (portado da referência) + isolamento por usuário.
@@ -200,6 +200,30 @@ Situação: fases 0, 1, 2 e 3 **concluídas**.
    fim do mês com as recorrências em conta. Compras que não reservam limite ficam fora do cálculo do limite por
    inteiro (nem consomem o saldo credor que passa para a fatura seguinte).
 4. **Tokens + API externa:** PAT, `external-api`, `/api/internal`, lotes de importação, idempotência, revisão e desfazer.
+   Implementado:
+   - **tokens pessoais** `cf_` + 256 bits:
+     - só o hash SHA-256 é gravado;
+     - validade de 30/90/180/365 dias;
+     - escopo leitura ou leitura+escrita;
+     - revogação imediata;
+     - recuperação de senha revoga todos.
+     A tabela de tokens não tem RLS porque a busca pelo hash acontece antes de saber o usuário.
+   - **api-externa** como repasse com lista fechada de rotas e sem nada de usuário. O backend valida o token
+     (`ApiTokenFilter`) depois do segredo de serviço.
+   - **importação** em lotes nos modos ANALISAR, CONFIRMADO e REMOVER:
+     - item a item, em transações separadas;
+     - duplicado conferido no servidor (`allowDuplicate` para forçar);
+     - `idempotencyKey`;
+     - categoria pelo nome;
+     - REMOVER cancela ou estorna, e desfazer o lote cancela o que ele criou.
+   - **anexos**:
+     - criptografados com AES-256-GCM (id como AAD) no volume `attachments`;
+     - tipo conferido pelo conteúdo;
+     - deduplicados por SHA-256;
+     - nunca apagados;
+     - incluídos no backup.
+   - **auditoria** (`audit_log`), com a origem WEB ou API e o token usado.
+   - **telas** de Importações, "Acesso do Claude" no Perfil e anexos no lançamento.
 5. **MCP:** servidor MCP remoto + autenticação (OAuth, se confirmado).
 6. Relatórios, orçamento, exportação LGPD, 2FA.
 

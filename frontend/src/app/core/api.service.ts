@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TokenResponse } from './auth.service';
 import {
-  Account, AccountRequest, AdminUser, BankAccount, Card, CardRequest, Category, CategoryRequest, CreditLine,
+  Account, AccountRequest, ActivityEntry, AdminUser, ApiToken, Attachment, ImportBatch, BankAccount, Card, CardRequest, Category, CategoryRequest, CreditLine,
   CreditLineRequest, Dashboard, InviteInfo, InvoiceDetail, InvoiceSummary, NewInvite, QuestionAnswer, Recurrence,
   RecurrenceMonth, RecurrenceRequest, Transaction, TransactionFilter, TransactionKind, TransactionRequest,
   WalletRequest,
@@ -192,6 +192,65 @@ export class ApiService {
 
   deleteCard(id: string): Observable<void> {
     return this.http.delete<void>(`/api/cards/${id}`);
+  }
+
+  // --- tokens de API (Claude) e atividade
+  apiTokens(): Observable<ApiToken[]> {
+    return this.http.get<ApiToken[]>('/api/account/tokens');
+  }
+
+  createApiToken(name: string, days: number, canWrite: boolean): Observable<ApiToken> {
+    return this.http.post<ApiToken>('/api/account/tokens', { name, days, canWrite });
+  }
+
+  revokeApiToken(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/account/tokens/${id}`);
+  }
+
+  activity(): Observable<ActivityEntry[]> {
+    return this.http.get<ActivityEntry[]>('/api/account/activity');
+  }
+
+  // --- importações do Claude
+  imports(): Observable<ImportBatch[]> {
+    return this.http.get<ImportBatch[]>('/api/imports');
+  }
+
+  importBatch(id: string): Observable<ImportBatch> {
+    return this.http.get<ImportBatch>(`/api/imports/${id}`);
+  }
+
+  confirmImport(id: string): Observable<ImportBatch> {
+    return this.http.post<ImportBatch>(`/api/imports/${id}/confirm`, null);
+  }
+
+  undoImport(id: string): Observable<ImportBatch> {
+    return this.http.post<ImportBatch>(`/api/imports/${id}/undo`, null);
+  }
+
+  // --- anexos
+  transactionAttachments(id: string): Observable<Attachment[]> {
+    return this.http.get<Attachment[]>(`/api/transactions/${id}/attachments`);
+  }
+
+  uploadAttachment(transactionId: string, file: File): Observable<Attachment> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<Attachment>(`/api/transactions/${transactionId}/attachments`, form);
+  }
+
+  /** Baixa o anexo (com o token no header) e entrega ao navegador como arquivo. */
+  downloadAttachment(a: Attachment): void {
+    this.http.get(`/api/attachments/${a.id}`, { responseType: 'blob' }).subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = a.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    });
   }
 
   // --- administração (somente admin)

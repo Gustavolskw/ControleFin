@@ -81,6 +81,8 @@ INTERNAL_API_SECRET=$(random_secret 32)
 # Chave dos backups criptografados (./controlefin.sh backup). Guarde uma cópia FORA do servidor:
 # sem ela não é possível restaurar os backups.
 BACKUP_ENCRYPTION_KEY=$(random_secret 32)
+# Chave dos anexos (prints, PDFs, planilhas) criptografados no disco. Guarde junto com o .env.
+ATTACHMENTS_KEY=$(random_secret 32)
 
 # Administrador padrão: criado no primeiro start; é quem gera os convites.
 # O primeiro login exige trocar esta senha e cadastrar as perguntas de segurança.
@@ -110,7 +112,7 @@ EOF
 # Versões novas podem exigir segredos novos: acrescenta ao .env existente só o que faltar (sem mexer no resto).
 ensure_env_keys() {
   local key value
-  for key in APP_DB_PASSWORD INTERNAL_API_SECRET BACKUP_ENCRYPTION_KEY; do
+  for key in APP_DB_PASSWORD INTERNAL_API_SECRET BACKUP_ENCRYPTION_KEY ATTACHMENTS_KEY; do
     if ! grep -q "^${key}=" .env; then
       value=$(random_secret 32)
       umask 077
@@ -193,7 +195,8 @@ cmd_update() {
   cmd_start
 }
 
-# Backup = pg_dump (formato custom) criptografado com AES-256 (chave BACKUP_ENCRYPTION_KEY do .env).
+# Backup = pg_dump (formato custom) + anexos, ambos criptografados com AES-256 (chave BACKUP_ENCRYPTION_KEY do .env).
+# Os anexos já ficam criptografados no disco (ATTACHMENTS_KEY); o .tar do backup é criptografado de novo.
 cmd_backup() {
   check_requirements
   load_env
@@ -201,13 +204,19 @@ cmd_backup() {
   command -v openssl >/dev/null 2>&1 || fail "openssl não encontrado (necessário para criptografar o backup)"
   mkdir -p "$BACKUP_DIR"
   chmod 700 "$BACKUP_DIR"
-  local file
-  file="${BACKUP_DIR}/controlefin-$(date +%Y%m%d-%H%M%S).dump.enc"
+  local stamp file files
+  stamp=$(date +%Y%m%d-%H%M%S)
+  file="${BACKUP_DIR}/controlefin-${stamp}.dump.enc"
+  files="${BACKUP_DIR}/controlefin-${stamp}.anexos.tar.enc"
   info "Gerando backup em ${file}"
   compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d controlefin -Fc \
     | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_ENCRYPTION_KEY > "$file"
   chmod 600 "$file"
-  ok "Backup concluído ($(du -h "$file" | cut -f1))"
+  info "Copiando anexos para ${files}"
+  compose exec -T backend tar -C /data/attachments -cf - . \
+    | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_ENCRYPTION_KEY > "$files"
+  chmod 600 "$files"
+  ok "Backup concluído (banco $(du -h "$file" | cut -f1), anexos $(du -h "$files" | cut -f1))"
 }
 
 cmd_restore() {
@@ -224,6 +233,14 @@ cmd_restore() {
   else
     cat "$file"
   fi | compose exec -T postgres pg_restore -U "$POSTGRES_USER" -d controlefin --clean --if-exists --no-owner
+  local files="${file%.dump.enc}.anexos.tar.enc"
+  if [[ "$file" == *.dump.enc && -f "$files" ]]; then
+    info "Restaurando anexos de ${files}"
+    openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_ENCRYPTION_KEY < "$files" \
+      | compose run --rm --no-deps -T --entrypoint sh backend -c 'rm -rf /data/attachments/* && tar -C /data/attachments -xf -'
+  else
+    warn "Arquivo de anexos não encontrado ao lado do backup (${files}); anexos mantidos como estão."
+  fi
   ok "Backup restaurado"
   cmd_start
 }

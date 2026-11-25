@@ -22,7 +22,19 @@ public final class CurrentUser {
         return principal.userId();
     }
 
-    /** Usuário autenticado colocado no contexto de segurança pelos filtros de autenticação. */
-    public record AuthPrincipal(UUID userId, String username) {
+    /** Token pessoal de API usado nesta requisição (null quando veio do site). */
+    public static UUID tokenId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getPrincipal() instanceof AuthPrincipal p ? p.tokenId() : null;
+    }
+
+    /**
+     * Usuário autenticado colocado no contexto de segurança pelos filtros de autenticação.
+     * tokenId: preenchido quando a chamada veio da API externa (token pessoal).
+     */
+    public record AuthPrincipal(UUID userId, String username, UUID tokenId) {
+        public AuthPrincipal(UUID userId, String username) {
+            this(userId, username, null);
+        }
     }
 }
