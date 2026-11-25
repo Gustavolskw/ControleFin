@@ -34,11 +34,25 @@ Fluxo: **Claude → `https://controlefin.<seu-dominio>/mcp` (servidor MCP) → A
 | `listar_lancamentos` | Busca por período, conta, cartão, categoria, tipo, situação e texto |
 | `verificar_duplicados` | Procura lançamento igual (mesmo valor, até 3 dias, mesma conta ou cartão); é usada **antes de lançar** |
 | `importar_lancamentos` | Lança um ou vários itens nos modos **CONFIRMADO** (padrão), **ANALISAR** (pendente) ou **REMOVER** (estorno/cancelamento). Cada item é conferido contra duplicidade. Devolve o **link para enviar o print/PDF** |
-| `editar_lancamento` · `confirmar_lancamento` · `estornar_lancamento` | Ajustes em um lançamento |
+| `ver_lancamento` | Todos os dados de um lançamento (parcela, fatura, moeda, recorrência, lote de origem) |
+| `editar_lancamento` · `confirmar_lancamento` · `estornar_lancamento` | Ajustes em um lançamento (inclui trocar entre carteira e cartão, fatura e moeda estrangeira) |
 | `recorrencias_do_mes` | Previsto × realizado (assinaturas, aluguel, salário) |
 | `listar_faturas` · `ver_fatura` | Faturas de um cartão e os itens de cada uma |
 | `listar_importacoes` · `ver_importacao` · `confirmar_importacao` · `desfazer_importacao` | Revisão dos lotes |
+| `anexar_texto_a_importacao` | Guarda CSV/TXT/OFX num lote já importado |
 | `link_para_anexos` | Gera um novo link de envio para um lote |
+| `listar_contas` · `ver_conta` · `criar_conta` · `editar_conta` | Contas (com carteiras) |
+| `criar_carteira` · `editar_carteira` · `ajustar_saldo` | Carteiras; `ajustar_saldo` lança um AJUSTE até o saldo real |
+| `listar_categorias` · `criar_categoria` · `editar_categoria` | Categorias e subcategorias |
+| `listar_limites` · `ver_limite` · `criar_limite` · `editar_limite` | Limites de crédito (fechamento, vencimento, carteira de pagamento) |
+| `listar_cartoes` · `criar_cartao` · `editar_cartao` | Cartões (crédito+débito, só débito, voucher) |
+| `listar_recorrencias` · `criar_recorrencia` · `editar_recorrencia` | Assinaturas, aluguel, salário |
+| `pular_ocorrencia` · `retomar_ocorrencia` · `candidatos_da_ocorrencia` · `vincular_a_recorrencia` | Ajustes de uma ocorrência |
+
+As ferramentas `editar_*` mudam só os campos informados. **Não há exclusão:** o Claude arquiva (`archived=true`) ou
+desativa a recorrência (`active=false`); excluir de verdade é só pelo site.
+
+**Regra:** as ferramentas são exatamente as rotas da API externa, só de gestão financeira. Não existe ferramenta de login, cadastro, senha, perfil, tokens ou configuração/edição de usuário; isso fica só no site.
 
 O Claude recebe, ao conectar, as regras combinadas:
 

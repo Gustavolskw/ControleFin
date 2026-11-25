@@ -21,10 +21,19 @@ import org.springframework.web.bind.annotation.RestController;
 import com.controlefin.audit.AuditService;
 import com.controlefin.common.CurrentUser;
 import com.controlefin.common.Money;
+import com.controlefin.finance.FinanceDtos.AccountRequest;
 import com.controlefin.finance.FinanceDtos.AccountResponse;
+import com.controlefin.finance.FinanceDtos.AdjustRequest;
+import com.controlefin.finance.FinanceDtos.CardRequest;
 import com.controlefin.finance.FinanceDtos.CardResponse;
+import com.controlefin.finance.FinanceDtos.CategoryRequest;
 import com.controlefin.finance.FinanceDtos.CategoryResponse;
+import com.controlefin.finance.FinanceDtos.CreditLineRequest;
 import com.controlefin.finance.FinanceDtos.CreditLineResponse;
+import com.controlefin.finance.FinanceDtos.RecurrenceLinkRequest;
+import com.controlefin.finance.FinanceDtos.RecurrenceRequest;
+import com.controlefin.finance.FinanceDtos.WalletRequest;
+import com.controlefin.finance.FinanceDtos.WalletUpdateRequest;
 import com.controlefin.finance.FinanceDtos.DashboardResponse;
 import com.controlefin.finance.FinanceDtos.InvoiceDetail;
 import com.controlefin.finance.FinanceDtos.InvoiceSummary;
@@ -44,7 +53,9 @@ import jakarta.validation.Valid;
 /**
  * Rotas que a api-externa repassa (Claude/MCP). Só chegam aqui com o segredo de serviço e um token pessoal válido
  * (o usuário vem do token, nunca da requisição). GET exige token de leitura; o resto, token com escrita.
- * Não há nada de login, cadastro ou administração de usuários aqui.
+ * Não há nada de login, cadastro ou administração de usuários aqui: só a gestão financeira (lançamentos, importações e os
+ * registros auxiliares: contas, carteiras, categorias, limites, cartões e recorrências). Não há exclusão: para tirar de
+ * uso, edite com archived=true (recorrência: active=false).
  */
 @RestController
 @RequestMapping("/api/internal/v1")
@@ -195,5 +206,196 @@ public class InternalApiController {
     @PostMapping("/imports/{id}/undo")
     public BatchResponse importUndo(@PathVariable UUID id) {
         return imports.undo(CurrentUser.id(), id);
+    }
+
+    // ---------------------------------------------------------------- contas e carteiras
+
+    @GetMapping("/accounts")
+    public List<AccountResponse> accountList() {
+        return accounts.list(CurrentUser.id(), Money.today());
+    }
+
+    @GetMapping("/accounts/{id}")
+    public AccountResponse account(@PathVariable UUID id) {
+        return accounts.get(CurrentUser.id(), id);
+    }
+
+    @PostMapping("/accounts")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AccountResponse createAccount(@Valid @RequestBody AccountRequest req) {
+        UUID u = CurrentUser.id();
+        AccountResponse r = accounts.create(u, req);
+        audit.log(u, "CONTA_CRIADA", r.id(), r.name());
+        return r;
+    }
+
+    @PutMapping("/accounts/{id}")
+    public AccountResponse updateAccount(@PathVariable UUID id, @Valid @RequestBody AccountRequest req) {
+        UUID u = CurrentUser.id();
+        AccountResponse r = accounts.update(u, id, req);
+        audit.log(u, "CONTA_EDITADA", id, r.name());
+        return r;
+    }
+
+    @PostMapping("/accounts/{id}/wallets")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AccountResponse addWallet(@PathVariable UUID id, @Valid @RequestBody WalletRequest req) {
+        UUID u = CurrentUser.id();
+        AccountResponse r = accounts.addWallet(u, id, req);
+        audit.log(u, "CARTEIRA_CRIADA", id, r.name() + " · " + req.name());
+        return r;
+    }
+
+    @PutMapping("/wallets/{id}")
+    public AccountResponse updateWallet(@PathVariable UUID id, @Valid @RequestBody WalletUpdateRequest req) {
+        UUID u = CurrentUser.id();
+        AccountResponse r = accounts.updateWallet(u, id, req);
+        audit.log(u, "CARTEIRA_EDITADA", id, r.name() + " · " + req.name());
+        return r;
+    }
+
+    /** Informa o saldo real: lança um AJUSTE com a diferença. */
+    @PostMapping("/wallets/{id}/adjust")
+    public AccountResponse adjustWallet(@PathVariable UUID id, @Valid @RequestBody AdjustRequest req) {
+        UUID u = CurrentUser.id();
+        AccountResponse r = accounts.adjust(u, id, req);
+        audit.log(u, "SALDO_AJUSTADO", id, r.name() + " · " + req.balance());
+        return r;
+    }
+
+    // ---------------------------------------------------------------- categorias
+
+    @GetMapping("/categories")
+    public List<CategoryResponse> categoryList() {
+        return categories.list(CurrentUser.id());
+    }
+
+    @PostMapping("/categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CategoryResponse createCategory(@Valid @RequestBody CategoryRequest req) {
+        UUID u = CurrentUser.id();
+        CategoryResponse r = categories.create(u, req);
+        audit.log(u, "CATEGORIA_CRIADA", r.id(), r.name());
+        return r;
+    }
+
+    @PutMapping("/categories/{id}")
+    public CategoryResponse updateCategory(@PathVariable UUID id, @Valid @RequestBody CategoryRequest req) {
+        UUID u = CurrentUser.id();
+        CategoryResponse r = categories.update(u, id, req);
+        audit.log(u, "CATEGORIA_EDITADA", id, r.name());
+        return r;
+    }
+
+    // ---------------------------------------------------------------- limites de crédito e cartões
+
+    @GetMapping("/credit-lines")
+    public List<CreditLineResponse> creditLineList() {
+        return cards.listCreditLines(CurrentUser.id());
+    }
+
+    @GetMapping("/credit-lines/{id}")
+    public CreditLineResponse creditLine(@PathVariable UUID id) {
+        return cards.getCreditLine(CurrentUser.id(), id);
+    }
+
+    @PostMapping("/credit-lines")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CreditLineResponse createCreditLine(@Valid @RequestBody CreditLineRequest req) {
+        UUID u = CurrentUser.id();
+        CreditLineResponse r = cards.createCreditLine(u, req);
+        audit.log(u, "LIMITE_CRIADO", r.id(), r.name() + " · " + r.limit());
+        return r;
+    }
+
+    @PutMapping("/credit-lines/{id}")
+    public CreditLineResponse updateCreditLine(@PathVariable UUID id, @Valid @RequestBody CreditLineRequest req) {
+        UUID u = CurrentUser.id();
+        CreditLineResponse r = cards.updateCreditLine(u, id, req);
+        audit.log(u, "LIMITE_EDITADO", id, r.name() + " · " + r.limit());
+        return r;
+    }
+
+    @GetMapping("/cards")
+    public List<CardResponse> cardList() {
+        return cards.listCards(CurrentUser.id());
+    }
+
+    @PostMapping("/cards")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CardResponse createCard(@Valid @RequestBody CardRequest req) {
+        UUID u = CurrentUser.id();
+        CardResponse r = cards.createCard(u, req);
+        audit.log(u, "CARTAO_CRIADO", r.id(), r.name());
+        return r;
+    }
+
+    @PutMapping("/cards/{id}")
+    public CardResponse updateCard(@PathVariable UUID id, @Valid @RequestBody CardRequest req) {
+        UUID u = CurrentUser.id();
+        CardResponse r = cards.updateCard(u, id, req);
+        audit.log(u, "CARTAO_EDITADO", id, r.name());
+        return r;
+    }
+
+    // ---------------------------------------------------------------- recorrências
+
+    @GetMapping("/recurrences")
+    public List<RecurrenceResponse> recurrenceList() {
+        return recurrences.list(CurrentUser.id());
+    }
+
+    @PostMapping("/recurrences")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RecurrenceResponse createRecurrence(@Valid @RequestBody RecurrenceRequest req) {
+        UUID u = CurrentUser.id();
+        RecurrenceResponse r = recurrences.create(u, req);
+        audit.log(u, "RECORRENCIA_CRIADA", r.id(), r.description() + " · " + r.amount());
+        return r;
+    }
+
+    @PutMapping("/recurrences/{id}")
+    public RecurrenceResponse updateRecurrence(@PathVariable UUID id, @Valid @RequestBody RecurrenceRequest req) {
+        UUID u = CurrentUser.id();
+        RecurrenceResponse r = recurrences.update(u, id, req);
+        audit.log(u, "RECORRENCIA_EDITADA", id, r.description() + " · " + r.amount());
+        return r;
+    }
+
+    /** Pula uma ocorrência (ex.: assinatura suspensa naquele mês). */
+    @PostMapping("/recurrences/{id}/occurrences/{date}/skip")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void skipOccurrence(@PathVariable UUID id,
+                               @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        UUID u = CurrentUser.id();
+        recurrences.skip(u, id, date);
+        audit.log(u, "OCORRENCIA_PULADA", id, date.toString());
+    }
+
+    /** Volta a prever uma ocorrência pulada. */
+    @PostMapping("/recurrences/{id}/occurrences/{date}/unskip")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unskipOccurrence(@PathVariable UUID id,
+                                 @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        UUID u = CurrentUser.id();
+        recurrences.unskip(u, id, date);
+        audit.log(u, "OCORRENCIA_RETOMADA", id, date.toString());
+    }
+
+    /** Lançamentos parecidos ainda sem vínculo com a ocorrência (possível duplicado: vincule em vez de lançar). */
+    @GetMapping("/recurrences/{id}/occurrences/{date}/candidates")
+    public List<TransactionResponse> occurrenceCandidates(@PathVariable UUID id,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return recurrences.candidates(CurrentUser.id(), id, date);
+    }
+
+    /** Liga um lançamento existente a uma ocorrência (campos nulos desligam). */
+    @PutMapping("/transactions/{id}/recurrence")
+    public TransactionResponse linkRecurrence(@PathVariable UUID id,
+                                              @RequestBody(required = false) RecurrenceLinkRequest req) {
+        UUID u = CurrentUser.id();
+        TransactionResponse r = recurrences.link(u, id, req);
+        audit.log(u, "LANCAMENTO_VINCULADO", id, r.description());
+        return r;
     }
 }

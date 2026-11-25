@@ -242,7 +242,7 @@ Situação: fases 0 a 5 **concluídas**. Conector do Claude: [`MCP.md`](MCP.md).
    - O MCP não transporta os arquivos do usuário. Por isso cada importação devolve um link de envio de 24 h, que usa a rota nova `POST /ext/v1/imports/{id}/attachments`.
 
    **Ferramentas**
-   - 16 ferramentas, cobrindo consulta, duplicidade, importação nos 3 modos, edição, estorno, recorrências, faturas e revisão de lotes.
+   - 42 ferramentas, uma para cada rota da API externa (paridade testada), só de gestão financeira (sem login, cadastro ou configuração de usuário), cobrindo consulta, duplicidade, importação nos 3 modos, edição, estorno, recorrências, faturas, revisão de lotes e os cadastros auxiliares (contas, carteiras, categorias, limites, cartões e recorrências: consultar, criar e editar; sem exclusão, arquivar no lugar).
    - O servidor entrega as instruções de uso ao conectar.
 6. Relatórios, orçamento, exportação LGPD, 2FA.
 

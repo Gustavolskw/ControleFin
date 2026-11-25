@@ -55,6 +55,36 @@ Base: `https://controlefin.<seu-dominio>/ext/v1` (local: `http://localhost:8091/
 | GET | `/imports` · `/imports/{id}` | leitura | Lotes enviados e o resultado de cada item |
 | POST | `/imports/{id}/confirm` | escrita | Confirma os pendentes de um lote `ANALISAR` |
 | POST | `/imports/{id}/undo` | escrita | Desfaz o lote (cancela o que ele criou; não vale para `REMOVER`) |
+| POST | `/imports/{id}/attachments` | escrita | Anexa arquivos a um lote (`{"attachments": [{"name", "mimeType", "contentBase64"}]}`) |
+
+### Registros auxiliares (consultar, criar e editar)
+
+Mesmos corpos das telas do site. **Não há exclusão:** para tirar de uso, edite com `archived: true` (recorrência:
+`active: false`). O `PUT` substitui o registro inteiro; envie todos os campos (o MCP faz isso sozinho, mudando só os
+informados).
+
+| Método | Rota | Permissão | O que faz |
+|---|---|---|---|
+| GET | `/accounts` · `/accounts/{id}` | leitura | Contas com carteiras e saldos |
+| POST | `/accounts` | escrita | Cria conta (`name`, `type`, `holder` PF/PJ, `color`, `wallets: [{name, initialBalance}]`) |
+| PUT | `/accounts/{id}` | escrita | Edita conta (`name`, `type`, `holder`, `color`, `archived`) |
+| POST | `/accounts/{id}/wallets` | escrita | Cria carteira (`name`, `initialBalance`) |
+| PUT | `/wallets/{id}` | escrita | Edita carteira (`name`, `initialBalance`, `archived`) |
+| POST | `/wallets/{id}/adjust` | escrita | Ajusta o saldo: `{"balance", "date", "description"}` lança um `AJUSTE` com a diferença |
+| GET | `/categories` | leitura | Categorias |
+| POST · PUT | `/categories` · `/categories/{id}` | escrita | Cria/edita (`name`, `kind` RECEITA/DESPESA, `parentId`, `color`, `archived`) |
+| GET | `/credit-lines` · `/credit-lines/{id}` | leitura | Limites de crédito: usado, disponível, reservado, faturas aberta e a pagar |
+| POST | `/credit-lines` | escrita | Cria limite (`name`, `limit`, `closingDay`, `dueDay`, `paymentWalletId`, `color`, `cards: [{name, format, walletId}]`) |
+| PUT | `/credit-lines/{id}` | escrita | Edita limite (mesmos campos, sem `cards`, com `archived`) |
+| GET | `/cards` | leitura | Cartões |
+| POST · PUT | `/cards` · `/cards/{id}` | escrita | Cria/edita (`name`, `format` FISICO/DIGITAL, `function` CREDITO_DEBITO/SO_DEBITO/VOUCHER_ALIMENTACAO, `creditLineId`, `walletId`, `archived`) |
+| GET | `/recurrences` | leitura | Recorrências com a próxima data |
+| POST · PUT | `/recurrences` · `/recurrences/{id}` | escrita | Cria/edita (`kind`, `description`, `amount`, `frequency`, `intervalCount`, `dayOfMonth`, `startDate`, `endDate`, `walletId` ou `cardId`+`credit`, `consumesLimit`, `categoryId`, moeda, `notes`, `active`) |
+| POST | `/recurrences/{id}/occurrences/{AAAA-MM-DD}/skip` · `/unskip` | escrita | Pula / volta a prever uma ocorrência |
+| GET | `/recurrences/{id}/occurrences/{AAAA-MM-DD}/candidates` | leitura | Lançamentos parecidos ainda sem vínculo (possível duplicado) |
+| PUT | `/transactions/{id}/recurrence` | escrita | Liga o lançamento a uma ocorrência (`recurrenceId`, `recurrenceDate`; nulos desligam) |
+
+Tudo o que é criado ou editado fica em **Meu perfil → Atividade recente**, com o nome do token.
 
 ## `POST /imports`
 

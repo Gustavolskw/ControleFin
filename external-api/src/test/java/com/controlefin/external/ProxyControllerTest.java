@@ -20,6 +20,22 @@ class ProxyControllerTest {
         assertTrue(ProxyController.allowed("POST", "/imports"));
         assertTrue(ProxyController.allowed("PUT", "/transactions/" + ID));
         assertTrue(ProxyController.allowed("POST", "/imports/" + ID + "/undo"));
+        assertTrue(ProxyController.allowed("POST", "/accounts"));
+        assertTrue(ProxyController.allowed("PUT", "/wallets/" + ID));
+        assertTrue(ProxyController.allowed("PUT", "/categories/" + ID));
+        assertTrue(ProxyController.allowed("POST", "/credit-lines"));
+        assertTrue(ProxyController.allowed("PUT", "/cards/" + ID));
+        assertTrue(ProxyController.allowed("POST", "/recurrences/" + ID + "/occurrences/2026-12-05/skip"));
+    }
+
+    @Test
+    void auxiliaresSemExclusao() {
+        for (String p : new String[] {"/accounts/", "/wallets/", "/categories/", "/credit-lines/", "/cards/",
+                "/recurrences/"}) {
+            assertFalse(ProxyController.allowed("DELETE", p + ID), p);
+        }
+        assertFalse(ProxyController.allowed("DELETE", "/recurrences/" + ID + "/skips/2026-12-05"));
+        assertFalse(ProxyController.allowed("POST", "/recurrences/" + ID + "/occurrences/12-2026/skip"));
     }
 
     @Test
@@ -27,6 +43,9 @@ class ProxyControllerTest {
         assertFalse(ProxyController.allowed("POST", "/auth/login"));
         assertFalse(ProxyController.allowed("GET", "/admin/users"));
         assertFalse(ProxyController.allowed("GET", "/account/tokens"));
+        assertFalse(ProxyController.allowed("POST", "/account/tokens"));
+        assertFalse(ProxyController.allowed("PUT", "/account/password"));
+        assertFalse(ProxyController.allowed("GET", "/account/activity"));
         assertFalse(ProxyController.allowed("DELETE", "/transactions/" + ID));
         assertFalse(ProxyController.allowed("GET", "/transactions/../admin/users"));
         assertFalse(ProxyController.allowed("GET", "/transactions/%2e%2e/admin"));

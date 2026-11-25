@@ -73,7 +73,9 @@ describe('fluxo OAuth + MCP', () => {
         } else if (req.url!.startsWith('/ext/v1/transactions/similar')) {
           res.end('[]');
         } else {
-          res.end('[]');
+          const id = '3f1c2a7e-9b8d-4c6a-a1b2-0c9d8e7f6a5b';
+          res.end(JSON.stringify([{ id, name: 'x', walletId: id, cardId: null, wallets: [{ id, name: 'w',
+            initialBalance: 0, archived: false }] }]));
         }
       });
     }).listen(0);
@@ -199,6 +201,9 @@ describe('fluxo OAuth + MCP', () => {
     for (const n of ['obter_contexto', 'verificar_duplicados', 'importar_lancamentos', 'estornar_lancamento']) {
       assert.ok(names.includes(n), n);
     }
+    assert.equal(names.length, 42);
+    // Regra: nada de login, cadastro, senha, perfil, token ou configuração de usuário.
+    for (const n of names) assert.doesNotMatch(n, /login|senha|usuario|perfil|cadastr|token|conta_de_acesso|config/);
   });
 
   it('MCP: ferramenta chama a API externa com o token pessoal', async () => {
@@ -208,6 +213,85 @@ describe('fluxo OAuth + MCP', () => {
     assert.equal(r.result.isError, undefined);
     assert.equal(calls[0].auth, `Bearer ${PAT}`);
     assert.match(calls[0].url, /\/ext\/v1\/transactions\/similar\?kind=DESPESA&date=2026-11-25&amount=10.5/);
+  });
+
+  it('MCP: toda rota da API externa tem ferramenta (paridade)', async () => {
+    const id = '3f1c2a7e-9b8d-4c6a-a1b2-0c9d8e7f6a5b';
+    const cases: [string, object, string, RegExp][] = [
+      ['obter_contexto', {}, 'GET', /\/context$/],
+      ['ver_painel', {}, 'GET', /\/dashboard/],
+      ['listar_lancamentos', {}, 'GET', /\/transactions$/],
+      ['verificar_duplicados', { kind: 'DESPESA', date: '2026-11-25', amount: 1 }, 'GET', /\/transactions\/similar/],
+      ['ver_lancamento', { id }, 'GET', new RegExp(`/transactions/${id}$`)],
+      ['editar_lancamento', { id, walletId: id }, 'PUT', new RegExp(`/transactions/${id}$`)],
+      ['confirmar_lancamento', { id }, 'POST', /\/confirm$/],
+      ['estornar_lancamento', { id }, 'POST', /\/reverse$/],
+      ['recorrencias_do_mes', {}, 'GET', /\/recurrences\/month/],
+      ['listar_faturas', { creditLineId: id }, 'GET', /\/credit-lines\/.+\/invoices$/],
+      ['ver_fatura', { invoiceId: id }, 'GET', /\/invoices\/[^/]+$/],
+      ['listar_importacoes', {}, 'GET', /\/imports$/],
+      ['importar_lancamentos', { items: [{ date: '2026-11-25', amount: 1 }] }, 'POST', /\/imports$/],
+      ['ver_importacao', { id }, 'GET', new RegExp(`/imports/${id}$`)],
+      ['anexar_texto_a_importacao', { importId: id, files: [{ name: 'a.csv', content: 'data;valor' }] }, 'POST',
+        /\/imports\/.+\/attachments$/],
+      ['confirmar_importacao', { id }, 'POST', /\/imports\/.+\/confirm$/],
+      ['desfazer_importacao', { id }, 'POST', /\/undo$/],
+      ['listar_contas', {}, 'GET', /\/accounts$/],
+      ['ver_conta', { id }, 'GET', new RegExp(`/accounts/${id}$`)],
+      ['criar_conta', { name: 'Nubank', type: 'CORRENTE', holder: 'PF' }, 'POST', /\/accounts$/],
+      ['editar_conta', { id, name: 'Nu' }, 'PUT', new RegExp(`/accounts/${id}$`)],
+      ['criar_carteira', { accountId: id, name: 'VA' }, 'POST', /\/accounts\/.+\/wallets$/],
+      ['editar_carteira', { id, archived: true }, 'PUT', new RegExp(`/wallets/${id}$`)],
+      ['ajustar_saldo', { walletId: id, balance: 10 }, 'POST', /\/wallets\/.+\/adjust$/],
+      ['listar_categorias', {}, 'GET', /\/categories$/],
+      ['criar_categoria', { name: 'Pets', kind: 'DESPESA' }, 'POST', /\/categories$/],
+      ['editar_categoria', { id, name: 'Pet' }, 'PUT', new RegExp(`/categories/${id}$`)],
+      ['listar_limites', {}, 'GET', /\/credit-lines$/],
+      ['ver_limite', { id }, 'GET', new RegExp(`/credit-lines/${id}$`)],
+      ['criar_limite', { name: 'Nu', limit: 1000, closingDay: 3, dueDay: 10 }, 'POST', /\/credit-lines$/],
+      ['editar_limite', { id, limit: 2000 }, 'PUT', new RegExp(`/credit-lines/${id}$`)],
+      ['listar_cartoes', {}, 'GET', /\/cards$/],
+      ['criar_cartao', { name: 'Nu virtual', format: 'DIGITAL', function: 'CREDITO_DEBITO', creditLineId: id }, 'POST',
+        /\/cards$/],
+      ['editar_cartao', { id, archived: true }, 'PUT', new RegExp(`/cards/${id}$`)],
+      ['listar_recorrencias', {}, 'GET', /\/recurrences$/],
+      ['criar_recorrencia', { kind: 'DESPESA', description: 'Netflix', amount: 40, frequency: 'MENSAL',
+        startDate: '2026-12-01', walletId: id }, 'POST', /\/recurrences$/],
+      ['editar_recorrencia', { id, amount: 45 }, 'PUT', new RegExp(`/recurrences/${id}$`)],
+      ['pular_ocorrencia', { recurrenceId: id, date: '2026-12-01' }, 'POST', /\/occurrences\/2026-12-01\/skip$/],
+      ['retomar_ocorrencia', { recurrenceId: id, date: '2026-12-01' }, 'POST', /\/occurrences\/2026-12-01\/unskip$/],
+      ['candidatos_da_ocorrencia', { recurrenceId: id, date: '2026-12-01' }, 'GET', /\/candidates$/],
+      ['vincular_a_recorrencia', { transactionId: id, recurrenceId: id, recurrenceDate: '2026-12-01' }, 'PUT',
+        /\/transactions\/.+\/recurrence$/],
+    ];
+    for (const [name, args, method, url] of cases) {
+      calls.length = 0;
+      await rpc({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name, arguments: args } });
+      const hit = calls.find(c => c.method === method && url.test(c.url.split('?')[0]));
+      assert.ok(hit, `${name} -> ${method} ${url} (chamou: ${calls.map(c => c.method + ' ' + c.url).join(', ')})`);
+    }
+  });
+
+  it('MCP: editar trocando para carteira tira o cartão', async () => {
+    calls.length = 0;
+    const id = '3f1c2a7e-9b8d-4c6a-a1b2-0c9d8e7f6a5b';
+    await rpc({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'editar_lancamento',
+      arguments: { id, walletId: id } } });
+    const put = JSON.parse(calls.find(c => c.method === 'PUT')!.body);
+    assert.equal(put.walletId, id);
+    assert.equal(put.cardId, null);
+    assert.equal(put.credit, null);
+  });
+
+  it('MCP: editar recorrência trocando para cartão tira a carteira', async () => {
+    calls.length = 0;
+    const id = '3f1c2a7e-9b8d-4c6a-a1b2-0c9d8e7f6a5b';
+    await rpc({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'editar_recorrencia',
+      arguments: { id, cardId: id, credit: true } } });
+    const put = JSON.parse(calls.find(c => c.method === 'PUT')!.body);
+    assert.equal(put.cardId, id);
+    assert.equal(put.walletId, null);
+    assert.equal(put.credit, true);
   });
 
   it('MCP: importar devolve link de envio que só abre a página do lote', async () => {

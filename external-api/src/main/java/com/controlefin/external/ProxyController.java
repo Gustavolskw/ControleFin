@@ -31,6 +31,7 @@ public class ProxyController {
 
     static final Pattern TOKEN = Pattern.compile("^cf_[A-Za-z0-9_-]{43}$");
     static final long MAX_BODY = 25L * 1024 * 1024;
+    private static final String DATE = "\\d{4}-\\d{2}-\\d{2}";
     private static final String UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
     record Route(String method, Pattern path) {
@@ -39,7 +40,11 @@ public class ProxyController {
         }
     }
 
-    /** Rotas permitidas (caminho depois de /ext/v1). Qualquer outra = 404. */
+    /**
+     * Rotas permitidas (caminho depois de /ext/v1). Qualquer outra = 404.
+     * REGRA: só rotas da gestão financeira. Nunca login, cadastro, senha, perfil, tokens ou qualquer configuração
+     * ou edição de usuário. O servidor MCP expõe exatamente estas rotas como ferramentas.
+     */
     static final List<Route> ROUTES = List.of(
             route("GET", "/context"),
             route("GET", "/dashboard"),
@@ -57,7 +62,32 @@ public class ProxyController {
             route("GET", "/imports/" + UUID),
             route("POST", "/imports/" + UUID + "/attachments"),
             route("POST", "/imports/" + UUID + "/confirm"),
-            route("POST", "/imports/" + UUID + "/undo"));
+            route("POST", "/imports/" + UUID + "/undo"),
+            // registros auxiliares: consultar, criar e editar (sem exclusão; arquivar = editar com archived=true)
+            route("GET", "/accounts"),
+            route("GET", "/accounts/" + UUID),
+            route("POST", "/accounts"),
+            route("PUT", "/accounts/" + UUID),
+            route("POST", "/accounts/" + UUID + "/wallets"),
+            route("PUT", "/wallets/" + UUID),
+            route("POST", "/wallets/" + UUID + "/adjust"),
+            route("GET", "/categories"),
+            route("POST", "/categories"),
+            route("PUT", "/categories/" + UUID),
+            route("GET", "/credit-lines"),
+            route("GET", "/credit-lines/" + UUID),
+            route("POST", "/credit-lines"),
+            route("PUT", "/credit-lines/" + UUID),
+            route("GET", "/cards"),
+            route("POST", "/cards"),
+            route("PUT", "/cards/" + UUID),
+            route("GET", "/recurrences"),
+            route("POST", "/recurrences"),
+            route("PUT", "/recurrences/" + UUID),
+            route("POST", "/recurrences/" + UUID + "/occurrences/" + DATE + "/skip"),
+            route("POST", "/recurrences/" + UUID + "/occurrences/" + DATE + "/unskip"),
+            route("GET", "/recurrences/" + UUID + "/occurrences/" + DATE + "/candidates"),
+            route("PUT", "/transactions/" + UUID + "/recurrence"));
 
     private static Route route(String method, String regex) {
         return new Route(method, Pattern.compile(regex));
