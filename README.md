@@ -1,6 +1,7 @@
 # ControleFin
 
-Controle financeiro pessoal e **privado**: contas bancárias com várias carteiras (ex.: Wiipo Livre e VA/VR), cartões
+Controle financeiro pessoal e **privado**, com **conector para o Claude** (consultar e lançar pelo chat, inclusive no
+celular — veja [`docs/MCP.md`](docs/MCP.md)): contas bancárias com várias carteiras (ex.: Wiipo Livre e VA/VR), cartões
 físicos e digitais com limite compartilhado, faturas, parcelamentos, gastos recorrentes e importação de extratos e
 faturas pelo Claude (MCP).
 
@@ -55,7 +56,8 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
                             ├── /              ─▶ frontend      (Angular estático)
                             ├── /api/          ─▶ backend ×N    (site; JWT)
                             ├── /api/internal/ ─▶ 404           (bloqueado de fora, sempre)
-                            └── /ext/v1/       ─▶ external-api  (MCP; token pessoal de API)
+                            ├── /mcp, /oauth/, /anexos/ ─▶ mcp-server (conector do Claude) ─▶ external-api
+                            └── /ext/v1/       ─▶ external-api  (token pessoal de API)
                                                      │
                                                      └─(rede interna)─▶ backend /api/internal/** (segredo de serviço)
  backend ─▶ postgres      (rede "data", interna: só o backend enxerga o banco)
@@ -63,6 +65,8 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 
 - **backend**: a API principal. Não publica porta; só o gateway (rotas do site) e a external-api (rotas internas)
   chegam nele. É a única autoridade sobre usuários e tokens.
+- **mcp-server**: conector do Claude (MCP remoto + OAuth em que a credencial é o token pessoal). Sem banco; só
+  conversa com a external-api. Passo a passo em [`docs/MCP.md`](docs/MCP.md).
 - **external-api**: API pública para o MCP. Sem banco e sem nada de login/cadastro/usuário; repassa o token pessoal
   ao backend, que valida e resolve o usuário.
 - O gateway sempre apaga o header `X-Internal-Secret` vindo de fora e responde 404 para `/api/internal/`.
@@ -122,14 +126,14 @@ volume `<pasta>_pg-data`. No modo standalone (sem Traefik) o gateway publica `80
 | Comando | O que faz |
 |---|---|
 | `./controlefin.sh start` / `stop` / `restart` / `status` | Sobe, para, reinicia, mostra estado |
-| `./controlefin.sh logs [nginx\|backend\|external-api\|frontend\|postgres]` | Logs |
+| `./controlefin.sh logs [nginx\|backend\|external-api\|mcp-server\|frontend\|postgres]` | Logs |
 | `./controlefin.sh update` | backup + `git pull` + rebuild (as migrações do banco rodam sozinhas) |
 | `./controlefin.sh backup` | `backups/controlefin-AAAAMMDD-HHMMSS.dump.enc` + `.anexos.tar.enc` (criptografados) |
 | `./controlefin.sh restore <arquivo>` | Restaura um backup (substitui os dados) |
 
 Backup diário: `0 3 * * * cd /caminho/controlefin && ./controlefin.sh backup >> backups/cron.log 2>&1`
 
-> Guarde o `.env` (principalmente `BACKUP_ENCRYPTION_KEY` e `ATTACHMENTS_KEY`) fora do servidor: sem ele os backups e
+> Guarde o `.env` (principalmente `BACKUP_ENCRYPTION_KEY`, `ATTACHMENTS_KEY` e `MCP_TOKEN_KEY`) fora do servidor: sem ele os backups e
 > os anexos não abrem.
 
 ## Desenvolvimento local
@@ -155,6 +159,7 @@ services:
 backend/       auth (login, convites, perguntas) · admin · user · apitoken (tokens do Claude) · audit · finance (contas, carteiras, categorias, lançamentos,
                cartões, faturas, recorrências, importações, anexos, painel, rotas internas) · config (JWT, filtros, RLS) · db/migration (Flyway)
 external-api/  API pública para o MCP (sem banco; repasse com lista fechada de rotas)
+mcp-server/    Conector do Claude: MCP (Streamable HTTP), OAuth 2.1 com o token pessoal, link de envio de arquivos
 frontend/      pages/ painel, lançamentos, contas, cartões, faturas, recorrências, importações, categorias, perfil, administração, login/cadastro/recuperação
 docker/nginx/  gateway (TLS, rate limit, bloqueio de /api/internal, headers de segurança)
 docs/          análise e decisões

@@ -182,6 +182,11 @@ public class InternalApiController {
         return imports.get(CurrentUser.id(), id);
     }
 
+    @PostMapping("/imports/{id}/attachments")
+    public BatchResponse importAttachments(@PathVariable UUID id, @Valid @RequestBody ImportDtos.AttachmentsRequest req) {
+        return imports.addAttachments(CurrentUser.id(), id, req);
+    }
+
     @PostMapping("/imports/{id}/confirm")
     public BatchResponse importConfirm(@PathVariable UUID id) {
         return imports.confirm(CurrentUser.id(), id);

@@ -55,6 +55,7 @@ public class ProxyController {
             route("GET", "/imports"),
             route("POST", "/imports"),
             route("GET", "/imports/" + UUID),
+            route("POST", "/imports/" + UUID + "/attachments"),
             route("POST", "/imports/" + UUID + "/confirm"),
             route("POST", "/imports/" + UUID + "/undo"));
 

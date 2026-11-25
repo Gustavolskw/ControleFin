@@ -69,6 +69,10 @@ public final class ImportDtos {
             UUID transactionId) {
     }
 
+    /** Arquivos enviados depois do lote (ex.: o print que o usuário escolheu pelo link de envio). */
+    public record AttachmentsRequest(@NotEmpty @Size(max = 10) List<@Valid ImportAttachment> attachments) {
+    }
+
     public record ImportRequest(
             ImportMode mode,
             @Size(max = 100) String idempotencyKey,

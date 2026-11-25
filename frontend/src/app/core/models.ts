@@ -451,7 +451,8 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   TOKEN_CRIADO: 'Token criado', TOKEN_REVOGADO: 'Token revogado', IMPORTACAO: 'Importação',
   IMPORTACAO_CONFIRMADA: 'Importação confirmada', IMPORTACAO_DESFEITA: 'Importação desfeita',
   LANCAMENTO_EDITADO: 'Lançamento editado', LANCAMENTO_CONFIRMADO: 'Lançamento confirmado',
-  LANCAMENTO_ESTORNADO: 'Lançamento estornado',
+  LANCAMENTO_ESTORNADO: 'Lançamento estornado', ANEXOS_ENVIADOS: 'Arquivos enviados',
+  MCP_CONECTADO: 'Claude conectado',
 };
 
 export interface Attachment {

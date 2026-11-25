@@ -330,6 +330,38 @@ public class ImportService {
         newTx.executeWithoutResult(st -> saveItem(userId, batchId, r));
     }
 
+    /**
+     * Anexa arquivos a um lote já processado: ligados ao lote e a todos os lançamentos que ele criou ou alterou.
+     * Usado pelo link de envio do MCP (o Claude não tem os bytes do print; o usuário escolhe o arquivo no celular).
+     */
+    @Transactional
+    public BatchResponse addAttachments(UUID userId, UUID batchId, ImportDtos.AttachmentsRequest req) {
+        row(userId, batchId);
+        long total = 0;
+        List<byte[]> files = new ArrayList<>();
+        for (ImportAttachment a : req.attachments()) {
+            try {
+                files.add(Base64.getMimeDecoder().decode(a.contentBase64()));
+            } catch (IllegalArgumentException e) {
+                throw ApiException.badRequest("Anexo \"" + a.name() + "\" não está em base64 válido.");
+            }
+            total += files.get(files.size() - 1).length;
+        }
+        if (total > 20L * 1024 * 1024) throw ApiException.badRequest("Os anexos passam de 20 MB.");
+        int start = attachments.forBatch(userId, batchId).size();
+        List<UUID> txIds = items(userId, batchId).stream().map(ItemResult::transactionId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        for (int i = 0; i < files.size(); i++) {
+            AttachmentInfo info = attachments.store(userId, req.attachments().get(i).name(), files.get(i));
+            attachments.linkToBatch(userId, batchId, info.id(), start + i);
+            for (UUID tx : txIds) {
+                if (transactions.findByIdAndUserId(tx, userId).isPresent()) attachments.link(userId, tx, info.id());
+            }
+        }
+        audit.log(userId, "ANEXOS_ENVIADOS", batchId, files.size() + " arquivo(s)");
+        return batch(userId, batchId, false);
+    }
+
     // ---------------------------------------------------------------- revisão (site) e desfazer
 
     @Transactional(readOnly = true)

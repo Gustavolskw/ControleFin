@@ -3,7 +3,7 @@
 # Não defina "name:" aqui: o nome do projeto (pasta) compõe o nome dos volumes com os dados.
 #
 # Redes:
-#   edge  -> nginx, frontend, backend, external-api  (tráfego HTTP)
+#   edge  -> nginx, frontend, backend, external-api, mcp-server  (tráfego HTTP)
 #   data  -> backend, postgres                         (só o backend enxerga o banco; "internal" = sem saída)
 
 volumes:
@@ -66,6 +66,21 @@ services:
       - data
 
   # API externa (MCP): sem banco; fala com o backend em /api/internal pela rede "edge".
+  # Servidor MCP remoto (conector do Claude): OAuth com o token pessoal; só fala com a api-externa.
+  mcp-server:
+    build: ./mcp-server
+    restart: unless-stopped
+    environment:
+      PORT: 8090
+      # Endereço público do sistema (o conector fica em <PUBLIC_URL>/mcp). Com Traefik: https://APP_DOMAIN.
+      PUBLIC_URL: ${MCP_PUBLIC_URL:-http://localhost:8091}
+      EXTERNAL_API_URL: http://external-api:8081/ext/v1
+      MCP_TOKEN_KEY: ${MCP_TOKEN_KEY:?defina MCP_TOKEN_KEY no .env (./controlefin.sh start cria)}
+    depends_on:
+      - external-api
+    networks:
+      - edge
+
   external-api:
     build: ./external-api
     restart: unless-stopped
@@ -101,6 +116,7 @@ services:
     depends_on:
       - backend
       - external-api
+      - mcp-server
       - frontend
     networks:
       - edge

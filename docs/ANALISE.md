@@ -179,7 +179,7 @@ import_batches (user_id, origem, token_id, status, criado_em, resumo)
 
 ## 7. Fases sugeridas
 
-Situação: fases 0 a 4 **concluídas**. Contrato da API externa: [`API_EXTERNA.md`](API_EXTERNA.md).
+Situação: fases 0 a 5 **concluídas**. Conector do Claude: [`MCP.md`](MCP.md). Contrato da API externa: [`API_EXTERNA.md`](API_EXTERNA.md).
 
 0. **Infra + Auth:** monorepo, compose (postgres, backend, frontend, nginx, traefik), `controlefin.sh`,
    login/convite/perguntas/primeiro acesso/bloqueio (portado da referência) + isolamento por usuário.
@@ -225,6 +225,25 @@ Situação: fases 0 a 4 **concluídas**. Contrato da API externa: [`API_EXTERNA.
    - **auditoria** (`audit_log`), com a origem WEB ou API e o token usado.
    - **telas** de Importações, "Acesso do Claude" no Perfil e anexos no lançamento.
 5. **MCP:** servidor MCP remoto + autenticação (OAuth, se confirmado).
+   Implementado: `mcp-server` (Node + SDK oficial, Streamable HTTP sem estado).
+
+   **Autenticação**
+   - OAuth 2.1 sem login próprio: a credencial é o token pessoal do site, e o backend segue como autoridade.
+   - **Por que OAuth:** a documentação do Claude diz que o cabeçalho fixo (`static_headers`) está em beta e só para algumas organizações; o OAuth com DCR é suportado por padrão no claude.ai, no Desktop e no celular.
+   - **Padrão seguido:**
+     - descoberta pelas RFC 9728 e 8414;
+     - registro dinâmico sem estado (só aceita o callback do Claude e loopback);
+     - PKCE S256;
+     - código de uso único;
+     - refresh com rotação.
+   - Tokens são envelopes AES-GCM (`MCP_TOKEN_KEY`).
+
+   **Arquivos**
+   - O MCP não transporta os arquivos do usuário. Por isso cada importação devolve um link de envio de 24 h, que usa a rota nova `POST /ext/v1/imports/{id}/attachments`.
+
+   **Ferramentas**
+   - 16 ferramentas, cobrindo consulta, duplicidade, importação nos 3 modos, edição, estorno, recorrências, faturas e revisão de lotes.
+   - O servidor entrega as instruções de uso ao conectar.
 6. Relatórios, orçamento, exportação LGPD, 2FA.
 
 ---

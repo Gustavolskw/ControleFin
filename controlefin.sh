@@ -83,6 +83,8 @@ INTERNAL_API_SECRET=$(random_secret 32)
 BACKUP_ENCRYPTION_KEY=$(random_secret 32)
 # Chave dos anexos (prints, PDFs, planilhas) criptografados no disco. Guarde junto com o .env.
 ATTACHMENTS_KEY=$(random_secret 32)
+# Chave do conector MCP do Claude (cifra os tokens OAuth). Trocar desconecta o Claude (basta reconectar).
+MCP_TOKEN_KEY=$(random_secret 32)
 
 # Administrador padrão: criado no primeiro start; é quem gera os convites.
 # O primeiro login exige trocar esta senha e cadastrar as perguntas de segurança.
@@ -112,7 +114,7 @@ EOF
 # Versões novas podem exigir segredos novos: acrescenta ao .env existente só o que faltar (sem mexer no resto).
 ensure_env_keys() {
   local key value
-  for key in APP_DB_PASSWORD INTERNAL_API_SECRET BACKUP_ENCRYPTION_KEY ATTACHMENTS_KEY; do
+  for key in APP_DB_PASSWORD INTERNAL_API_SECRET BACKUP_ENCRYPTION_KEY ATTACHMENTS_KEY MCP_TOKEN_KEY; do
     if ! grep -q "^${key}=" .env; then
       value=$(random_secret 32)
       umask 077
@@ -161,6 +163,11 @@ cmd_start() {
   ensure_env
   ensure_env_keys
   load_env
+  # Endereço público usado pelo conector do Claude (OAuth e links de envio).
+  if [[ -z "${MCP_PUBLIC_URL:-}" ]]; then
+    MCP_PUBLIC_URL=$(public_url)
+    export MCP_PUBLIC_URL
+  fi
   info "Construindo e subindo os serviços (backend x${BACKEND_REPLICAS:-1})"
   compose up -d --build --remove-orphans --scale "backend=${BACKEND_REPLICAS:-1}"
   wait_until_ready
