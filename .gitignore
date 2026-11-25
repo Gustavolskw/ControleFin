@@ -11,3 +11,7 @@ EXEMPLO/
 
 # Cópia local do banco de produção (script, acessos, senhas e backups): nunca vai para o git.
 PROD/
+
+# Anexos locais (mvn spring-boot:run grava em ./data/attachments)
+data/
+backend/data/
