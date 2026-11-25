@@ -73,6 +73,7 @@ export class AppComponent {
       { path: '/lancamentos', label: 'Lançamentos' },
       { path: '/contas', label: 'Contas' },
       { path: '/cartoes', label: 'Cartões' },
+      { path: '/recorrencias', label: 'Recorrências' },
       { path: '/categorias', label: 'Categorias' },
     ];
     return this.auth.isAdmin() ? [...base, { path: '/admin', label: 'Administração' }] : base;

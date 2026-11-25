@@ -118,6 +118,7 @@ interface CategoryGroup { parent: Category; children: Category[]; }
                 @if (t.status !== 'CONFIRMADO') { <span class="tag" [class.warn]="t.status === 'PENDENTE'">{{ statusLabel[t.status] }}</span> }
                 @if (t.kind !== 'RECEITA' && t.kind !== 'DESPESA') { <span class="tag" [class.ok]="t.kind === 'ESTORNO'">{{ kindLabel[t.kind] }}</span> }
                 @if (t.originalCurrency) { <span class="tag">{{ t.originalCurrency }} {{ t.originalAmount }}</span> }
+                @if (t.recurrenceId) { <span class="tag accent" title="Lançamento de uma recorrência">Recorrente</span> }
                 @if (t.origin === 'API') { <span class="tag accent" title="Enviado pelo Claude (API externa)">Claude</span> }
                 <div class="meta muted">{{ where(t) }}@if (t.categoryName) { · {{ t.categoryName }} }</div>
               </td>
@@ -574,8 +575,27 @@ export class TransactionsComponent implements OnInit {
     if (f.foreign && (!/^[A-Za-z]{3}$/.test(f.originalCurrency.trim()) || !(Number(f.originalAmount) > 0) || !(Number(f.exchangeRate) > 0))) {
       return this.formError.set('Na compra internacional, informe a moeda (ex.: USD), o valor na moeda e a cotação.');
     }
-    this.busy.set(true);
     const req = this.toRequest(f);
+    if (f.id || f.kind === 'TRANSFERENCIA' || f.kind === 'AJUSTE') return this.send(f, req, again);
+    // Antes de gravar, procura um lançamento igual já cadastrado (evita duplicar).
+    this.busy.set(true);
+    this.api.similarTransactions(f.kind, f.date, Number(f.amount), req.walletId, req.cardId ?? null).subscribe({
+      next: list => {
+        this.busy.set(false);
+        if (list.length > 0) {
+          const t = list[0];
+          const msg = `Já existe um lançamento parecido: "${t.description}" em ${t.date.split('-').reverse().join('/')} ` +
+            `com o mesmo valor${list.length > 1 ? ` (e mais ${list.length - 1})` : ''}. Lançar mesmo assim?`;
+          if (!confirm(msg)) return;
+        }
+        this.send(f, req, again);
+      },
+      error: () => { this.busy.set(false); this.send(f, req, again); },
+    });
+  }
+
+  private send(f: TxForm, req: TransactionRequest, again: boolean): void {
+    this.busy.set(true);
     const call = f.id ? this.api.updateTransaction(f.id, req) : this.api.createTransaction(req);
     call.subscribe({
       next: () => {

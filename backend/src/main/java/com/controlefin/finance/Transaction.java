@@ -93,6 +93,13 @@ public class Transaction {
     @Column(precision = 19, scale = 2)
     private BigDecimal iof;
 
+    /** Ocorrência de recorrência que este lançamento realizou. */
+    @Column(name = "recurrence_id")
+    private UUID recurrenceId;
+
+    @Column(name = "recurrence_date")
+    private LocalDate recurrenceDate;
+
     /** Estorno: compra original. */
     @Column(name = "reversal_of")
     private UUID reversalOf;
@@ -158,6 +165,12 @@ public class Transaction {
         this.originalAmount = originalAmount;
         this.exchangeRate = exchangeRate;
         this.iof = iof;
+    }
+    public UUID getRecurrenceId() { return recurrenceId; }
+    public LocalDate getRecurrenceDate() { return recurrenceDate; }
+    public void setRecurrence(UUID recurrenceId, LocalDate recurrenceDate) {
+        this.recurrenceId = recurrenceId;
+        this.recurrenceDate = recurrenceId == null ? null : recurrenceDate;
     }
     public UUID getReversalOf() { return reversalOf; }
     public void setReversalOf(UUID reversalOf) { this.reversalOf = reversalOf; }

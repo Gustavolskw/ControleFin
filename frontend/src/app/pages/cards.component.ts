@@ -91,7 +91,7 @@ interface WalletOption { id: string; label: string; }
           </div>
 
           <app-limit-meter [used]="l.used" [limit]="l.limit" [available]="l.available" />
-          <p class="muted small">Limite {{ l.limit | brl }}</p>
+          <p class="muted small">Limite {{ l.limit | brl }}@if (l.reserved > 0) { · reservado por recorrências {{ l.reserved | brl }} }</p>
 
           <div class="invoices">
             @if (l.dueInvoice; as inv) {

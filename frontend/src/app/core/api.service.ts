@@ -4,8 +4,9 @@ import { Observable } from 'rxjs';
 import { TokenResponse } from './auth.service';
 import {
   Account, AccountRequest, AdminUser, BankAccount, Card, CardRequest, Category, CategoryRequest, CreditLine,
-  CreditLineRequest, Dashboard, InviteInfo, InvoiceDetail, InvoiceSummary, NewInvite, QuestionAnswer, Transaction,
-  TransactionFilter, TransactionRequest, WalletRequest,
+  CreditLineRequest, Dashboard, InviteInfo, InvoiceDetail, InvoiceSummary, NewInvite, QuestionAnswer, Recurrence,
+  RecurrenceMonth, RecurrenceRequest, Transaction, TransactionFilter, TransactionKind, TransactionRequest,
+  WalletRequest,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -98,6 +99,53 @@ export class ApiService {
 
   deleteTransaction(id: string): Observable<void> {
     return this.http.delete<void>(`/api/transactions/${id}`);
+  }
+
+  /** Possíveis duplicados (mesmo tipo e valor, até 3 dias, mesma carteira/cartão). */
+  similarTransactions(kind: TransactionKind, date: string, amount: number, walletId: string | null,
+                      cardId: string | null, excludeId: string | null = null): Observable<Transaction[]> {
+    const params: Record<string, string> = { kind, date, amount: String(amount) };
+    if (walletId) params['walletId'] = walletId;
+    if (cardId) params['cardId'] = cardId;
+    if (excludeId) params['excludeId'] = excludeId;
+    return this.http.get<Transaction[]>('/api/transactions/similar', { params });
+  }
+
+  // --- recorrências
+  recurrences(): Observable<Recurrence[]> {
+    return this.http.get<Recurrence[]>('/api/recurrences');
+  }
+
+  recurrenceMonth(month: string): Observable<RecurrenceMonth> {
+    return this.http.get<RecurrenceMonth>('/api/recurrences/month', { params: { month } });
+  }
+
+  createRecurrence(req: RecurrenceRequest): Observable<Recurrence> {
+    return this.http.post<Recurrence>('/api/recurrences', req);
+  }
+
+  updateRecurrence(id: string, req: RecurrenceRequest): Observable<Recurrence> {
+    return this.http.put<Recurrence>(`/api/recurrences/${id}`, req);
+  }
+
+  deleteRecurrence(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/recurrences/${id}`);
+  }
+
+  skipOccurrence(id: string, date: string): Observable<void> {
+    return this.http.post<void>(`/api/recurrences/${id}/skips/${date}`, null);
+  }
+
+  unskipOccurrence(id: string, date: string): Observable<void> {
+    return this.http.delete<void>(`/api/recurrences/${id}/skips/${date}`);
+  }
+
+  occurrenceCandidates(id: string, date: string): Observable<Transaction[]> {
+    return this.http.get<Transaction[]>(`/api/recurrences/${id}/occurrences/${date}/candidates`);
+  }
+
+  linkRecurrence(transactionId: string, recurrenceId: string | null, recurrenceDate: string | null): Observable<Transaction> {
+    return this.http.put<Transaction>(`/api/transactions/${transactionId}/recurrence`, { recurrenceId, recurrenceDate });
   }
 
   /** Estorna/cancela uma compra (nunca apaga). */

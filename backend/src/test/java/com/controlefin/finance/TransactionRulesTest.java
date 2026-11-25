@@ -47,7 +47,7 @@ class TransactionRulesTest {
         InvoiceRepository invoices = mock(InvoiceRepository.class);
         CreditLineRepository lines = mock(CreditLineRepository.class);
         service = new TransactionService(transactions, wallets, accounts, categories, mock(CardRepository.class),
-                lines, invoices, new InvoiceService(invoices, lines));
+                lines, invoices, new InvoiceService(invoices, lines), mock(RecurrenceRepository.class));
 
         UUID accountId = UUID.randomUUID();
         wallet = withId(new Wallet(me, accountId));

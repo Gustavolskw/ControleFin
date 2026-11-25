@@ -172,6 +172,18 @@ public class FinanceController {
         return transactions.update(CurrentUser.id(), id, req);
     }
 
+    /** Possíveis duplicados: mesmo tipo e valor, até 3 dias de diferença, mesma carteira/cartão. */
+    @GetMapping("/transactions/similar")
+    public List<TransactionResponse> similarTransactions(
+            @RequestParam TransactionKind kind,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam java.math.BigDecimal amount,
+            @RequestParam(required = false) UUID walletId,
+            @RequestParam(required = false) UUID cardId,
+            @RequestParam(required = false) UUID excludeId) {
+        return transactions.similar(CurrentUser.id(), kind, date, amount, walletId, cardId, excludeId);
+    }
+
     /** Estorna/cancela uma compra (nunca apaga). */
     @PostMapping("/transactions/{id}/reverse")
     public TransactionResponse reverseTransaction(@PathVariable UUID id, @RequestBody(required = false) ReverseRequest req) {

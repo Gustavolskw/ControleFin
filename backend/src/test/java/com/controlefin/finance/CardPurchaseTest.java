@@ -57,7 +57,7 @@ class CardPurchaseTest {
         CreditLineRepository lines = mock(CreditLineRepository.class);
         InvoiceRepository invoices = mock(InvoiceRepository.class);
         service = new TransactionService(transactions, wallets, mock(AccountRepository.class),
-                mock(CategoryRepository.class), cards, lines, invoices, new InvoiceService(invoices, lines));
+                mock(CategoryRepository.class), cards, lines, invoices, new InvoiceService(invoices, lines), mock(RecurrenceRepository.class));
 
         wallet = withId(new Wallet(me, UUID.randomUUID()));
         wallet.setName("Principal");
@@ -125,7 +125,7 @@ class CardPurchaseTest {
     private TransactionRequest purchase(LocalDate date, String amount, UUID cardId, Boolean credit, Integer installments,
                                         Boolean consumesLimit) {
         return new TransactionRequest(TransactionKind.DESPESA, null, date, "Compra", new BigDecimal(amount), null, null,
-                null, null, cardId, credit, installments, consumesLimit, null, null, null, null, null);
+                null, null, cardId, credit, installments, consumesLimit, null, null, null, null, null, null, null);
     }
 
     private Invoice invoiceOf(Transaction t) {
@@ -188,14 +188,14 @@ class CardPurchaseTest {
     void moedaEstrangeiraCalculaReaisComIof() {
         var req = new TransactionRequest(TransactionKind.DESPESA, null, LocalDate.of(2026, 11, 10), "Claude Pro", null,
                 null, null, null, null, credit.getId(), true, null, false, null, "usd", new BigDecimal("20.00"),
-                new BigDecimal("5.50"), new BigDecimal("3.85"));
+                new BigDecimal("5.50"), new BigDecimal("3.85"), null, null);
         var r = service.create(me, req, Origin.WEB);
         assertEquals(new BigDecimal("113.85"), r.amount());
         assertEquals("USD", r.originalCurrency());
 
         var parcelado = new TransactionRequest(TransactionKind.DESPESA, null, LocalDate.of(2026, 11, 10), "X", null,
                 null, null, null, null, credit.getId(), true, 2, null, null, "USD", new BigDecimal("20.00"),
-                new BigDecimal("5.50"), null);
+                new BigDecimal("5.50"), null, null, null);
         assertThrows(ApiException.class, () -> service.create(me, parcelado, Origin.WEB));
     }
 
@@ -204,14 +204,14 @@ class CardPurchaseTest {
         var compra = service.create(me, purchase(LocalDate.of(2026, 11, 10), "80", credit.getId(), true, null, null), Origin.WEB);
         var pay = new TransactionRequest(TransactionKind.PAGAMENTO_FATURA, null, LocalDate.of(2026, 12, 5), "Fatura",
                 new BigDecimal("80"), wallet.getId(), null, null, null, null, null, null, null, compra.invoiceId(),
-                null, null, null, null);
+                null, null, null, null, null, null);
         var r = service.create(me, pay, Origin.WEB);
         assertEquals(wallet.getId(), r.walletId());
         assertEquals(compra.invoiceId(), r.invoiceId());
 
         var semFatura = new TransactionRequest(TransactionKind.PAGAMENTO_FATURA, null, LocalDate.of(2026, 12, 5), "Fatura",
                 new BigDecimal("80"), wallet.getId(), null, null, null, null, null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null);
         assertThrows(ApiException.class, () -> service.create(me, semFatura, Origin.WEB));
     }
 

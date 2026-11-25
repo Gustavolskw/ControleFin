@@ -32,9 +32,12 @@ public class DashboardService {
     private final TransactionRepository transactions;
     private final CategoryRepository categories;
     private final CardService cardService;
+    private final RecurrenceService recurrenceService;
 
     public DashboardService(AccountService accountService, TransactionRepository transactions,
-                            CategoryRepository categories, CardService cardService) {
+                            CategoryRepository categories, CardService cardService,
+                            RecurrenceService recurrenceService) {
+        this.recurrenceService = recurrenceService;
         this.accountService = accountService;
         this.transactions = transactions;
         this.categories = categories;
@@ -57,12 +60,13 @@ public class DashboardService {
         }
         LocalDate endOfMonth = YearMonth.from(today).atEndOfMonth();
         BigDecimal projected = accountService.balances(userId, endOfMonth).values().stream()
-                .reduce(Money.nz(null), BigDecimal::add);
+                .reduce(Money.nz(null), BigDecimal::add)
+                .add(recurrenceService.pendingWalletImpact(userId, YearMonth.from(today)));
 
         var lines = cardService.listCreditLines(userId).stream().filter(l -> !l.archived()).toList();
         return new DashboardResponse(today, total, pf, pj, projected, accounts, summary(userId, ym),
                 transactions.countByUserIdAndStatus(userId, TransactionStatus.PENDENTE), CardService.toPay(lines),
-                lines);
+                lines, recurrenceService.upcoming(userId, 30, 8));
     }
 
     MonthSummary summary(UUID userId, YearMonth ym) {

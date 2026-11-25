@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { errorMessage } from '../core/auth.interceptor';
 import { BrlPipe, DateBrPipe, currentMonth } from '../core/format';
-import { Dashboard, INVOICE_STATUS_LABEL, accountTypeLabel } from '../core/models';
+import { Dashboard, INVOICE_STATUS_LABEL, OCCURRENCE_LABEL, accountTypeLabel } from '../core/models';
 import { LimitMeterComponent } from '../shared/limit-meter.component';
 import { MonthPickerComponent } from '../shared/month-picker.component';
 
@@ -33,7 +33,7 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
         <div class="kpi">
           <div class="label">Previsão no fim do mês</div>
           <div class="value">{{ d.projectedEndOfMonth | brl }}</div>
-          <div class="detail">com lançamentos já agendados</div>
+          <div class="detail">com lançamentos agendados e recorrências</div>
         </div>
         @if (d.creditLines.length > 0) {
           <div class="kpi">
@@ -82,6 +82,22 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
         </section>
 
         <section class="side">
+        @if (d.upcoming.length > 0) {
+          <section class="card">
+            <div class="section-head"><h2>Próximos compromissos</h2><a routerLink="/recorrencias" class="btn ghost small">Ver todos</a></div>
+            <ul class="upcoming">
+              @for (o of d.upcoming; track o.recurrenceId + o.date) {
+                <li>
+                  <span class="date">{{ o.date | dateBr }}</span>
+                  <span class="desc">{{ o.description }}
+                    @if (o.status === 'ATRASADA') { <span class="tag warn">{{ occLabel[o.status] }}</span> }
+                    <span class="muted small">{{ o.paidWith }}</span></span>
+                  <span class="val" [class.pos]="o.kind === 'RECEITA'">{{ o.kind === 'RECEITA' ? '+' : '−' }}{{ o.expectedAmount | brl }}</span>
+                </li>
+              }
+            </ul>
+          </section>
+        }
         @if (d.creditLines.length > 0) {
           <section class="card">
             <div class="section-head"><h2>Cartões de crédito</h2><a routerLink="/cartoes" class="btn ghost small">Gerenciar</a></div>
@@ -142,6 +158,11 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
     .fill { height: 100%; background: var(--brand); border-radius: 4px; min-width: 2px; }
     .bars li:hover .fill { background: var(--brand-strong); }
     .side { display: grid; gap: 16px; }
+    .upcoming { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .upcoming li { display: grid; grid-template-columns: 78px 1fr auto; gap: 8px; align-items: baseline; font-size: 13px; }
+    .upcoming .date { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .upcoming .desc { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; }
+    .upcoming .val { font-weight: 600; font-variant-numeric: tabular-nums; }
     .lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
     .line-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
       margin-bottom: 6px; color: var(--text); text-decoration: none; }
@@ -157,6 +178,7 @@ export class DashboardComponent {
   error = signal('');
   readonly typeLabel = accountTypeLabel;
   readonly statusLabel = INVOICE_STATUS_LABEL;
+  readonly occLabel = OCCURRENCE_LABEL;
 
   activeAccounts = computed(() => (this.data()?.accounts ?? []).filter(a => !a.archived));
   private maxExpense = computed(() => Math.max(0, ...(this.data()?.month.expensesByCategory ?? []).map(c => c.amount)));

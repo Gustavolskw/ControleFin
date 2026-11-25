@@ -18,6 +18,7 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 | **Contas** | Contas (corrente, digital, benefício…) com uma ou mais **carteiras** de saldo próprio (ex.: Wiipo "Livre" e "VA/VR"); ajuste de saldo pelo valor real do banco. |
 | **Cartões** | Cartões de crédito (limite compartilhado pelos cartões físico e digitais, fechamento e vencimento), débito e voucher alimentação; limite usado/disponível; fatura aberta e fatura a pagar. |
 | **Faturas** | Fatura por mês: compras, parcelas, estornos e pagamentos; pagar (parcial ou total) e estornar compras. |
+| **Recorrências** | Assinaturas, aluguel, salário (mensal, anual ou semanal): previsto × realizado no mês, lançar cada ocorrência uma única vez, pular, vincular um lançamento já feito; aviso de possível duplicado. |
 | **Categorias** | Categorias de despesa/receita com subcategorias (padrões criados no primeiro acesso). |
 | **Administração** | (só admin) convites e ativação de contas — sem acesso a dados financeiros. |
 | **Meu perfil** | Troca de senha (encerra as outras sessões) e das perguntas de segurança. |
@@ -37,6 +38,12 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
   crédito na fatura seguinte.
 - **Estornar** nunca apaga: o que ainda não fechou é cancelado; o que já foi cobrado volta como ESTORNO (crédito na
   fatura aberta ou entrada na carteira, no débito).
+- **Recorrência**: cada ocorrência vira no máximo um lançamento (o banco impede duplicar; cancelar libera). Antes de
+  lançar, o sistema mostra lançamentos parecidos sem vínculo para vincular em vez de duplicar; lançamentos comuns
+  também avisam quando já existe um igual (mesmo valor, até 3 dias, mesma conta/cartão).
+- **Reserva de limite** da recorrência no crédito: a próxima cobrança ainda não lançada que cai na fatura aberta já
+  ocupa limite ("reservado"). Desmarcado: não reserva nada, nem quando lançada.
+- **Previsão no fim do mês** inclui recorrências em conta do mês ainda não lançadas (crédito vai para a fatura).
 - **Faturas a pagar** (painel) = faturas fechadas não pagas + fatura aberta de cada cartão (sem parcelas futuras).
 - Dinheiro sempre `NUMERIC(19,2)` / `BigDecimal`, arredondamento bancário (HALF_EVEN).
 
@@ -134,9 +141,9 @@ services:
 
 ```
 backend/       auth (login, convites, perguntas) · admin · user · finance (contas, carteiras, categorias, lançamentos,
-               cartões, faturas, painel) · config (JWT, filtros, RLS) · db/migration (Flyway)
+               cartões, faturas, recorrências, painel) · config (JWT, filtros, RLS) · db/migration (Flyway)
 external-api/  API pública para o MCP (sem banco)
-frontend/      pages/ painel, lançamentos, contas, cartões, faturas, categorias, perfil, administração, login/cadastro/recuperação
+frontend/      pages/ painel, lançamentos, contas, cartões, faturas, recorrências, categorias, perfil, administração, login/cadastro/recuperação
 docker/nginx/  gateway (TLS, rate limit, bloqueio de /api/internal, headers de segurança)
 docs/          análise e decisões
 ```

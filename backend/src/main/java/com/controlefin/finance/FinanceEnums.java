@@ -40,4 +40,12 @@ public final class FinanceEnums {
      * VENCIDA = passou do vencimento sem pagar tudo; PAGA = fechada e quitada.
      */
     public enum InvoiceStatus { ABERTA, FUTURA, FECHADA, VENCIDA, PAGA }
+
+    public enum Frequency { SEMANAL, MENSAL, ANUAL }
+
+    /**
+     * Ocorrência de uma recorrência: REALIZADA (tem lançamento), PULADA, ATRASADA (data já passou sem lançamento)
+     * ou PREVISTA (ainda vai acontecer).
+     */
+    public enum OccurrenceStatus { REALIZADA, PULADA, ATRASADA, PREVISTA }
 }

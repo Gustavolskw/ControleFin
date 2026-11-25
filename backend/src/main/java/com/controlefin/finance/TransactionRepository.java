@@ -32,6 +32,27 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
 
     boolean existsByUserIdAndReversalOfIn(UUID userId, java.util.Collection<UUID> ids);
 
+    boolean existsByUserIdAndRecurrenceId(UUID userId, UUID recurrenceId);
+
+    /** Lançamentos (não cancelados) que realizaram ocorrências de recorrências no período. */
+    @Query("select t from Transaction t where t.userId = :userId and t.recurrenceId is not null "
+            + "and t.status <> com.controlefin.finance.FinanceEnums.TransactionStatus.CANCELADO "
+            + "and t.recurrenceDate between :from and :to")
+    List<Transaction> realized(@Param("userId") UUID userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("select count(t) > 0 from Transaction t where t.userId = :userId and t.recurrenceId = :rid "
+            + "and t.recurrenceDate = :date and t.status <> com.controlefin.finance.FinanceEnums.TransactionStatus.CANCELADO "
+            + "and t.id <> :exceptId")
+    boolean occurrenceTaken(@Param("userId") UUID userId, @Param("rid") UUID recurrenceId,
+                            @Param("date") LocalDate date, @Param("exceptId") UUID exceptId);
+
+    /** Candidatos a duplicado/vínculo: mesmo tipo, não cancelados, no intervalo de datas. */
+    @Query("select t from Transaction t where t.userId = :userId and t.kind = :kind "
+            + "and t.status <> com.controlefin.finance.FinanceEnums.TransactionStatus.CANCELADO "
+            + "and t.date between :from and :to order by t.date desc")
+    List<Transaction> sameKindBetween(@Param("userId") UUID userId, @Param("kind") FinanceEnums.TransactionKind kind,
+                                      @Param("from") LocalDate from, @Param("to") LocalDate to);
+
     long countByUserIdAndStatus(UUID userId, FinanceEnums.TransactionStatus status);
 
     /**

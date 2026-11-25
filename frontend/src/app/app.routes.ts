@@ -9,6 +9,7 @@ import { InvoicesComponent } from './pages/invoices.component';
 import { LoginComponent } from './pages/login.component';
 import { ProfileComponent } from './pages/profile.component';
 import { RecoverComponent } from './pages/recover.component';
+import { RecurrencesComponent } from './pages/recurrences.component';
 import { RegisterComponent } from './pages/register.component';
 import { TransactionsComponent } from './pages/transactions.component';
 
@@ -20,6 +21,7 @@ export const routes: Routes = [
   { path: 'lancamentos', component: TransactionsComponent, canActivate: [authGuard] },
   { path: 'contas', component: AccountsComponent, canActivate: [authGuard] },
   { path: 'cartoes', component: CardsComponent, canActivate: [authGuard] },
+  { path: 'recorrencias', component: RecurrencesComponent, canActivate: [authGuard] },
   { path: 'cartoes/:id/faturas', component: InvoicesComponent, canActivate: [authGuard] },
   { path: 'categorias', component: CategoriesComponent, canActivate: [authGuard] },
   { path: 'perfil', component: ProfileComponent, canActivate: [authGuard] },

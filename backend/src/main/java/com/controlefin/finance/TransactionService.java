@@ -53,11 +53,13 @@ public class TransactionService {
     private final CreditLineRepository creditLines;
     private final InvoiceRepository invoices;
     private final InvoiceService invoiceService;
+    private final RecurrenceRepository recurrences;
 
     public TransactionService(TransactionRepository transactions, WalletRepository wallets,
                               AccountRepository accounts, CategoryRepository categories, CardRepository cards,
                               CreditLineRepository creditLines, InvoiceRepository invoices,
-                              InvoiceService invoiceService) {
+                              InvoiceService invoiceService, RecurrenceRepository recurrences) {
+        this.recurrences = recurrences;
         this.transactions = transactions;
         this.wallets = wallets;
         this.accounts = accounts;
@@ -148,10 +150,23 @@ public class TransactionService {
     @Transactional
     public TransactionResponse create(UUID userId, TransactionRequest req, Origin origin) {
         Plan p = plan(userId, req, null);
+        Recurrence recurrence = null;
+        if (req.recurrenceId() != null) {
+            recurrence = recurrences.findByIdAndUserId(req.recurrenceId(), userId)
+                    .orElseThrow(() -> ApiException.notFound("Recorrência não encontrada."));
+            RecurrenceService.checkOccurrence(transactions, userId, recurrence, req.recurrenceDate(), req.kind(),
+                    p.installments() > 1, null);
+        } else if (req.recurrenceDate() != null) {
+            throw ApiException.badRequest("Informe a recorrência da ocorrência.");
+        }
         List<Transaction> rows = new ArrayList<>();
         if (p.installments() == 1) {
             Transaction t = new Transaction(userId, origin);
             fill(t, req, p, p.amount(), req.date(), p.invoice());
+            if (recurrence != null) {
+                t.setRecurrence(recurrence.getId(), req.recurrenceDate());
+                recurrences.unskip(recurrence.getId(), req.recurrenceDate());
+            }
             rows.add(t);
         } else {
             UUID group = UUID.randomUUID();
@@ -276,6 +291,24 @@ public class TransactionService {
         }
         transactions.flush();
         return toResponse(result, names(userId));
+    }
+
+    /**
+     * Possíveis duplicados de um lançamento novo: mesmo tipo e mesmo valor, até 3 dias de diferença e, se informados,
+     * na mesma carteira ou cartão. Use antes de gravar (o Claude também deve usar antes de importar).
+     */
+    @Transactional(readOnly = true)
+    public List<TransactionResponse> similar(UUID userId, TransactionKind kind, LocalDate date, BigDecimal amount,
+                                             UUID walletId, UUID cardId, UUID excludeId) {
+        BigDecimal value = Money.of(amount);
+        Names names = names(userId);
+        return transactions.sameKindBetween(userId, kind, date.minusDays(3), date.plusDays(3)).stream()
+                .filter(t -> excludeId == null || !excludeId.equals(t.getId()))
+                .filter(t -> t.getAmount().compareTo(value) == 0)
+                .filter(t -> (walletId == null && cardId == null)
+                        || (cardId != null && cardId.equals(t.getCardId()))
+                        || (walletId != null && walletId.equals(t.getWalletId())))
+                .limit(10).map(t -> toResponse(t, names)).toList();
     }
 
     Transaction transaction(UUID userId, UUID id) {
@@ -526,6 +559,7 @@ public class TransactionService {
                 line == null ? null : line.getId(), line == null ? null : line.getName(),
                 t.getInvoiceId(), inv == null ? null : inv.getReference().toString(), t.isConsumesLimit(),
                 t.getInstallmentGroup(), t.getInstallmentNumber(), t.getInstallmentCount(),
-                t.getOriginalCurrency(), t.getOriginalAmount(), t.getExchangeRate(), t.getIof(), t.getReversalOf());
+                t.getOriginalCurrency(), t.getOriginalAmount(), t.getExchangeRate(), t.getIof(), t.getReversalOf(),
+                t.getRecurrenceId(), t.getRecurrenceDate());
     }
 }

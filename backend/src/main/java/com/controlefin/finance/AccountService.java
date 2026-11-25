@@ -32,9 +32,11 @@ public class AccountService {
     private final WalletRepository wallets;
     private final TransactionRepository transactions;
     private final CardRepository cards;
+    private final RecurrenceRepository recurrences;
 
     public AccountService(AccountRepository accounts, WalletRepository wallets, TransactionRepository transactions,
-                          CardRepository cards) {
+                          CardRepository cards, RecurrenceRepository recurrences) {
+        this.recurrences = recurrences;
         this.accounts = accounts;
         this.wallets = wallets;
         this.transactions = transactions;
@@ -110,6 +112,9 @@ public class AccountService {
             if (cards.existsByUserIdAndWalletId(userId, w.getId())) {
                 throw ApiException.badRequest("Esta conta tem cartões ligados. Remova ou mude os cartões antes.");
             }
+            if (recurrences.existsByUserIdAndWalletId(userId, w.getId())) {
+                throw ApiException.badRequest("Esta conta é usada por uma recorrência. Mude a recorrência antes.");
+            }
         }
         accounts.delete(account);
     }
@@ -152,6 +157,9 @@ public class AccountService {
         }
         if (cards.existsByUserIdAndWalletId(userId, walletId)) {
             throw ApiException.badRequest("Esta carteira tem cartões ligados. Remova ou mude os cartões antes.");
+        }
+        if (recurrences.existsByUserIdAndWalletId(userId, walletId)) {
+            throw ApiException.badRequest("Esta carteira é usada por uma recorrência. Mude a recorrência antes.");
         }
         if (wallets.findByUserIdAndAccountIdOrderByPositionAscNameAsc(userId, wallet.getAccountId()).size() <= 1) {
             throw ApiException.badRequest("A conta precisa ter pelo menos uma carteira.");

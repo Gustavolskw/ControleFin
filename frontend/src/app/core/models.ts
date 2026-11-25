@@ -150,6 +150,8 @@ export interface Transaction {
   exchangeRate: number | null;
   iof: number | null;
   reversalOf: string | null;
+  recurrenceId: string | null;
+  recurrenceDate: string | null;
 }
 
 export interface TransactionRequest {
@@ -171,6 +173,8 @@ export interface TransactionRequest {
   originalAmount?: number | null;
   exchangeRate?: number | null;
   iof?: number | null;
+  recurrenceId?: string | null;
+  recurrenceDate?: string | null;
 }
 
 export interface TransactionFilter {
@@ -259,6 +263,8 @@ export interface CreditLine {
   currentInvoice: InvoiceSummary | null;
   dueInvoice: InvoiceSummary | null;
   toPay: number;
+  /** Recorrências no crédito que reservam limite e ainda vão cair na fatura aberta. */
+  reserved: number;
 }
 
 export interface CreditLineRequest {
@@ -300,6 +306,88 @@ export interface Dashboard {
   pendingCount: number;
   invoicesToPay: number;
   creditLines: CreditLine[];
+  upcoming: Occurrence[];
+}
+
+// ------------------------------------------------------------------ recorrências
+
+export type Frequency = 'SEMANAL' | 'MENSAL' | 'ANUAL';
+export type OccurrenceStatus = 'REALIZADA' | 'PULADA' | 'ATRASADA' | 'PREVISTA';
+
+export const OCCURRENCE_LABEL: Record<OccurrenceStatus, string> = {
+  REALIZADA: 'Lançada', PULADA: 'Pulada', ATRASADA: 'Atrasada', PREVISTA: 'Prevista',
+};
+
+export interface Recurrence {
+  id: string;
+  kind: 'RECEITA' | 'DESPESA';
+  description: string;
+  amount: number;
+  frequency: Frequency;
+  intervalCount: number;
+  dayOfMonth: number | null;
+  startDate: string;
+  endDate: string | null;
+  walletId: string | null;
+  cardId: string | null;
+  credit: boolean;
+  consumesLimit: boolean;
+  paidWith: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  originalCurrency: string | null;
+  originalAmount: number | null;
+  notes: string | null;
+  active: boolean;
+  nextDate: string | null;
+}
+
+export interface RecurrenceRequest {
+  kind: 'RECEITA' | 'DESPESA';
+  description: string;
+  amount: number;
+  frequency: Frequency;
+  intervalCount: number;
+  dayOfMonth: number | null;
+  startDate: string;
+  endDate: string | null;
+  walletId: string | null;
+  cardId: string | null;
+  credit: boolean | null;
+  consumesLimit: boolean | null;
+  categoryId: string | null;
+  originalCurrency: string | null;
+  originalAmount: number | null;
+  notes: string | null;
+  active: boolean;
+}
+
+export interface Occurrence {
+  recurrenceId: string;
+  description: string;
+  kind: 'RECEITA' | 'DESPESA';
+  date: string;
+  expectedAmount: number;
+  status: OccurrenceStatus;
+  transactionId: string | null;
+  actualAmount: number | null;
+  paidWith: string;
+  credit: boolean;
+  candidates: number;
+  originalCurrency: string | null;
+  originalAmount: number | null;
+}
+
+export interface RecurrenceMonth {
+  month: string;
+  expectedExpense: number;
+  realizedExpense: number;
+  pendingExpense: number;
+  expectedIncome: number;
+  realizedIncome: number;
+  pendingIncome: number;
+  occurrences: Occurrence[];
+  recurrences: Recurrence[];
 }
 
 // ------------------------------------------------------------------ administração

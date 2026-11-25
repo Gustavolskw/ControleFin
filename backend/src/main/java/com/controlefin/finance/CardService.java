@@ -36,10 +36,15 @@ public class CardService {
     private final AccountRepository accounts;
     private final TransactionRepository transactions;
     private final InvoiceService invoiceService;
+    private final RecurrenceService recurrenceService;
+    private final RecurrenceRepository recurrences;
 
     public CardService(CreditLineRepository creditLines, CardRepository cards, InvoiceRepository invoices,
                        WalletRepository wallets, AccountRepository accounts, TransactionRepository transactions,
-                       InvoiceService invoiceService) {
+                       InvoiceService invoiceService, RecurrenceService recurrenceService,
+                       RecurrenceRepository recurrences) {
+        this.recurrenceService = recurrenceService;
+        this.recurrences = recurrences;
         this.creditLines = creditLines;
         this.cards = cards;
         this.invoices = invoices;
@@ -64,10 +69,21 @@ public class CardService {
         Map<UUID, List<Invoice>> byLine = invoices.findByUserIdOrderByReferenceMonthAsc(userId).stream()
                 .collect(Collectors.groupingBy(Invoice::getCreditLineId));
         List<CardResponse> allCards = cards.findByUserIdOrderByNameAsc(userId).stream().map(c -> toResponse(c, n)).toList();
-        return lines.stream().map(l -> {
+        Map<UUID, List<InvoiceSummary>> sumsByLine = new java.util.HashMap<>();
+        Map<UUID, InvoiceSummary> openByLine = new java.util.HashMap<>();
+        for (CreditLine l : lines) {
             List<InvoiceSummary> sums = InvoiceService.summaries(l, byLine.getOrDefault(l.getId(), List.of()),
                     totals, today);
+            sumsByLine.put(l.getId(), sums);
+            sums.stream().filter(s -> s.status() == InvoiceStatus.ABERTA).findFirst()
+                    .ifPresent(s -> openByLine.put(l.getId(), s));
+        }
+        Map<UUID, BigDecimal> reservedByLine = recurrenceService.reservedByCreditLine(userId, openByLine,
+                lines.stream().collect(Collectors.toMap(CreditLine::getId, Function.identity())));
+        return lines.stream().map(l -> {
+            List<InvoiceSummary> sums = sumsByLine.get(l.getId());
             BigDecimal used = InvoiceService.used(sums);
+            BigDecimal reserved = reservedByLine.getOrDefault(l.getId(), Money.nz(null));
             InvoiceSummary current = sums.stream().filter(s -> s.status() == InvoiceStatus.ABERTA).findFirst().orElse(null);
             InvoiceSummary due = sums.stream()
                     .filter(s -> s.status() == InvoiceStatus.FECHADA || s.status() == InvoiceStatus.VENCIDA)
@@ -79,8 +95,9 @@ public class CardService {
             Wallet pw = l.getPaymentWalletId() == null ? null : n.wallets().get(l.getPaymentWalletId());
             return new CreditLineResponse(l.getId(), l.getName(), l.getColor(), l.getLimitAmount(), l.getClosingDay(),
                     l.getDueDay(), l.getPaymentWalletId(), pw == null ? null : walletLabel(pw, n), l.isArchived(),
-                    used, l.getLimitAmount().subtract(used),
-                    allCards.stream().filter(c -> l.getId().equals(c.creditLineId())).toList(), current, due, toPay);
+                    used, l.getLimitAmount().subtract(used).subtract(reserved),
+                    allCards.stream().filter(c -> l.getId().equals(c.creditLineId())).toList(), current, due, toPay,
+                    reserved);
         }).sorted(Comparator.comparing(CreditLineResponse::archived)).toList();
     }
 
@@ -215,6 +232,9 @@ public class CardService {
         Card card = card(userId, id);
         if (transactions.existsByUserIdAndCardId(userId, id)) {
             throw ApiException.badRequest("Este cartão tem lançamentos. Arquive-o em vez de excluir.");
+        }
+        if (recurrences.existsByUserIdAndCardId(userId, id)) {
+            throw ApiException.badRequest("Este cartão é usado por uma recorrência. Mude a recorrência antes.");
         }
         cards.delete(card);
     }

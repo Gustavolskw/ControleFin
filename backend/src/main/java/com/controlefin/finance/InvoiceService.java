@@ -179,10 +179,24 @@ public class InvoiceService {
         return out;
     }
 
-    /** Parte do limite ocupada pelas faturas (já com o crédito levado de uma fatura para a outra). */
+    /**
+     * Parte do limite ocupada pelas faturas (em ordem de mês). Compras que não reservam limite ficam fora do
+     * cálculo por inteiro: nem ocupam limite nem "gastam" o crédito que passa de uma fatura para a outra.
+     * Pagamentos e estornos abatem primeiro a parte que ocupa limite.
+     */
     static BigDecimal used(List<InvoiceSummary> summaries) {
-        return summaries.stream().map(s -> s.outstanding().subtract(s.nonConsuming()).max(BigDecimal.ZERO))
-                .reduce(Money.nz(null), BigDecimal::add);
+        BigDecimal used = Money.nz(null);
+        BigDecimal carry = Money.nz(null);
+        for (InvoiceSummary s : summaries) {
+            BigDecimal consuming = s.total().subtract(s.nonConsuming()).subtract(s.paid()).subtract(carry);
+            if (consuming.signum() < 0) {
+                carry = consuming.negate();
+            } else {
+                used = used.add(consuming);
+                carry = Money.nz(null);
+            }
+        }
+        return used;
     }
 
     // ---------------------------------------------------------------- consultas do site

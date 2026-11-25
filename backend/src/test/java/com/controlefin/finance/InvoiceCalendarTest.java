@@ -92,6 +92,27 @@ class InvoiceCalendarTest {
         assertEquals(new BigDecimal("30.00"), InvoiceService.used(sums));
     }
 
+    @Test
+    void compraQueNaoReservaNaoGastaOCreditoLevadoParaAProximaFatura() throws Exception {
+        LocalDate today = LocalDate.of(2026, 11, 24);
+        CreditLine line = new CreditLine(UUID.randomUUID());
+        Invoice dec = invoice(LocalDate.of(2026, 12, 3), LocalDate.of(2026, 12, 10));
+        Invoice jan = invoice(LocalDate.of(2027, 1, 3), LocalDate.of(2027, 1, 10));
+        set(dec, "referenceMonth", LocalDate.of(2026, 12, 1));
+        set(jan, "referenceMonth", LocalDate.of(2027, 1, 1));
+        // Dezembro: crédito de 86,15 (estorno + pagamento) que passa para janeiro (parcela de 100).
+        var semAssinatura = java.util.Map.of(
+                dec.getId(), new InvoiceService.Totals(new BigDecimal("13.85"), BigDecimal.ZERO, new BigDecimal("100.00")),
+                jan.getId(), new InvoiceService.Totals(new BigDecimal("100.00"), BigDecimal.ZERO, BigDecimal.ZERO));
+        BigDecimal antes = InvoiceService.used(InvoiceService.summaries(line, java.util.List.of(dec, jan), semAssinatura, today));
+        assertEquals(new BigDecimal("13.85"), antes);
+        // Entra uma assinatura de 118,30 que não reserva limite: o limite usado não muda.
+        var comAssinatura = java.util.Map.of(
+                dec.getId(), new InvoiceService.Totals(new BigDecimal("132.15"), new BigDecimal("118.30"), new BigDecimal("100.00")),
+                jan.getId(), new InvoiceService.Totals(new BigDecimal("100.00"), BigDecimal.ZERO, BigDecimal.ZERO));
+        assertEquals(antes, InvoiceService.used(InvoiceService.summaries(line, java.util.List.of(dec, jan), comAssinatura, today)));
+    }
+
     static Invoice invoice(LocalDate closing, LocalDate due) throws Exception {
         Invoice inv = newInvoice(UUID.randomUUID(), UUID.randomUUID(), YearMonth.from(due));
         inv.setClosingDate(closing);

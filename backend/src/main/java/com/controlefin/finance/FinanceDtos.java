@@ -9,6 +9,8 @@ import java.util.UUID;
 import com.controlefin.finance.FinanceEnums.AccountType;
 import com.controlefin.finance.FinanceEnums.CardFormat;
 import com.controlefin.finance.FinanceEnums.CardFunction;
+import com.controlefin.finance.FinanceEnums.Frequency;
+import com.controlefin.finance.FinanceEnums.OccurrenceStatus;
 import com.controlefin.finance.FinanceEnums.InvoiceStatus;
 import com.controlefin.finance.FinanceEnums.CategoryKind;
 import com.controlefin.finance.FinanceEnums.Holder;
@@ -96,6 +98,8 @@ public final class FinanceDtos {
      * PAGAMENTO_FATURA: walletId (de onde sai) + invoiceId.
      * Moeda estrangeira: originalCurrency + originalAmount + exchangeRate (+ iof); sem amount, o valor em reais é
      * calculado (original × cotação + IOF).
+     * Recorrência: recurrenceId + recurrenceDate ligam o lançamento à ocorrência que ele realiza (só ao criar;
+     * para mudar o vínculo depois, use /api/transactions/{id}/recurrence).
      */
     public record TransactionRequest(
             @NotNull TransactionKind kind,
@@ -115,14 +119,16 @@ public final class FinanceDtos {
             @Pattern(regexp = "^[A-Za-z]{3}$", message = "moeda com 3 letras (ex.: USD)") String originalCurrency,
             @Digits(integer = 15, fraction = 2) BigDecimal originalAmount,
             @Digits(integer = 12, fraction = 6) BigDecimal exchangeRate,
-            @Digits(integer = 15, fraction = 2) BigDecimal iof) {
+            @Digits(integer = 15, fraction = 2) BigDecimal iof,
+            UUID recurrenceId,
+            LocalDate recurrenceDate) {
 
         /** Atalho para lançamentos simples em carteira. */
         public static TransactionRequest simple(TransactionKind kind, TransactionStatus status, LocalDate date,
                                                 String description, BigDecimal amount, UUID walletId,
                                                 UUID targetWalletId, UUID categoryId, String notes) {
             return new TransactionRequest(kind, status, date, description, amount, walletId, targetWalletId,
-                    categoryId, notes, null, null, null, null, null, null, null, null, null);
+                    categoryId, notes, null, null, null, null, null, null, null, null, null, null, null);
         }
     }
 
@@ -136,12 +142,17 @@ public final class FinanceDtos {
                                       UUID invoiceId, String invoiceReference, boolean consumesLimit,
                                       UUID installmentGroup, Integer installmentNumber, Integer installmentCount,
                                       String originalCurrency, BigDecimal originalAmount, BigDecimal exchangeRate,
-                                      BigDecimal iof, UUID reversalOf) {
+                                      BigDecimal iof, UUID reversalOf, UUID recurrenceId,
+                                      LocalDate recurrenceDate) {
     }
 
     public record TransactionFilter(LocalDate from, LocalDate to, UUID accountId, UUID walletId, UUID categoryId,
                                     TransactionKind kind, TransactionStatus status, String q, UUID cardId,
                                     UUID creditLineId) {
+    }
+
+    /** Ligar um lançamento já existente a uma ocorrência de recorrência (ou desligar, com os dois nulos). */
+    public record RecurrenceLinkRequest(UUID recurrenceId, LocalDate recurrenceDate) {
     }
 
     /** Estornar/cancelar uma compra (nunca apaga). date = data do estorno (padrão: hoje). */
@@ -198,12 +209,15 @@ public final class FinanceDtos {
     /**
      * used = parte do limite ocupada (todas as faturas não pagas, inclusive parcelas futuras, sem as compras que
      * não reservam limite). currentInvoice = fatura aberta; dueInvoice = fatura fechada mais antiga a pagar;
-     * toPay = soma a pagar das faturas fechadas não pagas + fatura aberta (sem parcelas futuras).
+     * toPay = soma a pagar das faturas fechadas não pagas + fatura aberta (sem parcelas futuras);
+     * reserved = recorrências no crédito que reservam limite e ainda vão cair na fatura aberta
+     * (available = limite − used − reserved).
      */
     public record CreditLineResponse(UUID id, String name, String color, BigDecimal limit, int closingDay,
                                      int dueDay, UUID paymentWalletId, String paymentWalletName, boolean archived,
                                      BigDecimal used, BigDecimal available, List<CardResponse> cards,
-                                     InvoiceSummary currentInvoice, InvoiceSummary dueInvoice, BigDecimal toPay) {
+                                     InvoiceSummary currentInvoice, InvoiceSummary dueInvoice, BigDecimal toPay,
+                                     BigDecimal reserved) {
     }
 
     // ---------------------------------------------------------------- painel
@@ -219,10 +233,66 @@ public final class FinanceDtos {
      * total = soma de todas as contas e carteiras (PF + PJ + benefícios).
      * projectedEndOfMonth = saldo considerando também os lançamentos confirmados com data até o fim do mês.
      */
-    /** invoicesToPay = faturas fechadas não pagas + fatura aberta de cada limite (sem parcelas futuras). */
+    /**
+     * invoicesToPay = faturas fechadas não pagas + fatura aberta de cada limite (sem parcelas futuras);
+     * projectedEndOfMonth já considera as recorrências do mês (em conta) ainda não lançadas;
+     * upcoming = próximas ocorrências (e atrasadas) de recorrências.
+     */
     public record DashboardResponse(LocalDate asOf, BigDecimal total, BigDecimal totalPf, BigDecimal totalPj,
                                     BigDecimal projectedEndOfMonth, List<AccountResponse> accounts,
                                     MonthSummary month, long pendingCount, BigDecimal invoicesToPay,
-                                    List<CreditLineResponse> creditLines) {
+                                    List<CreditLineResponse> creditLines, List<OccurrenceResponse> upcoming) {
+    }
+
+    // ---------------------------------------------------------------- recorrências
+
+    /**
+     * Recorrência. Pagamento como num lançamento: walletId, ou cardId + credit. dayOfMonth vale para MENSAL e ANUAL
+     * (padrão: dia da data de início); ANUAL usa o mês da data de início; SEMANAL repete a cada 7 × intervalCount dias.
+     * Moeda estrangeira: originalCurrency + originalAmount; amount = previsão em reais.
+     */
+    public record RecurrenceRequest(
+            @NotNull TransactionKind kind,
+            @NotBlank @Size(max = 200) String description,
+            @NotNull @DecimalMin(value = "0.01") @Digits(integer = 15, fraction = 2) BigDecimal amount,
+            @NotNull Frequency frequency,
+            @Min(1) @Max(12) Integer intervalCount,
+            @Min(1) @Max(31) Integer dayOfMonth,
+            @NotNull LocalDate startDate,
+            LocalDate endDate,
+            UUID walletId,
+            UUID cardId,
+            Boolean credit,
+            Boolean consumesLimit,
+            UUID categoryId,
+            @Pattern(regexp = "^[A-Za-z]{3}$", message = "moeda com 3 letras (ex.: USD)") String originalCurrency,
+            @DecimalMin(value = "0.01") @Digits(integer = 15, fraction = 2) BigDecimal originalAmount,
+            @Size(max = 1000) String notes,
+            Boolean active) {
+    }
+
+    public record RecurrenceResponse(UUID id, TransactionKind kind, String description, BigDecimal amount,
+                                     Frequency frequency, int intervalCount, Integer dayOfMonth, LocalDate startDate,
+                                     LocalDate endDate, UUID walletId, UUID cardId, boolean credit,
+                                     boolean consumesLimit, String paidWith, UUID categoryId, String categoryName,
+                                     String originalCurrency, BigDecimal originalAmount, String notes, boolean active,
+                                     LocalDate nextDate) {
+    }
+
+    /**
+     * Ocorrência de uma recorrência numa data. transaction = lançamento que a realizou; candidates = lançamentos
+     * parecidos ainda sem vínculo (possível duplicado: vincule em vez de lançar de novo).
+     */
+    public record OccurrenceResponse(UUID recurrenceId, String description, TransactionKind kind, LocalDate date,
+                                     BigDecimal expectedAmount, OccurrenceStatus status, UUID transactionId,
+                                     BigDecimal actualAmount, String paidWith, boolean credit, int candidates,
+                                     String originalCurrency, BigDecimal originalAmount) {
+    }
+
+    /** Mês de recorrências: previsto × realizado. pending = previsto ainda não lançado (atrasado + a vencer). */
+    public record RecurrenceMonth(String month, BigDecimal expectedExpense, BigDecimal realizedExpense,
+                                  BigDecimal pendingExpense, BigDecimal expectedIncome, BigDecimal realizedIncome,
+                                  BigDecimal pendingIncome, List<OccurrenceResponse> occurrences,
+                                  List<RecurrenceResponse> recurrences) {
     }
 }

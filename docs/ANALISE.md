@@ -179,7 +179,7 @@ import_batches (user_id, origem, token_id, status, criado_em, resumo)
 
 ## 7. Fases sugeridas
 
-Situação: fases 0, 1 e 2 **concluídas**.
+Situação: fases 0, 1, 2 e 3 **concluídas**.
 
 0. **Infra + Auth:** monorepo, compose (postgres, backend, frontend, nginx, traefik), `controlefin.sh`,
    login/convite/perguntas/primeiro acesso/bloqueio (portado da referência) + isolamento por usuário.
@@ -191,6 +191,14 @@ Situação: fases 0, 1 e 2 **concluídas**.
    ESTORNO (nunca apaga: cancela o que não fechou, devolve como crédito o que já foi cobrado), saldo credor levado
    para a fatura seguinte. Sem juros/rotativo: fatura não paga fica "Vencida" na própria fatura.
 3. **Recorrências:** previsto × realizado, reserva de limite, painel de compromissos.
+   Implementado: `recurrences` (mensal/anual/semanal, intervalo, dia, início/fim, mesmas opções de um lançamento:
+   conta ou cartão crédito/débito, categoria, moeda estrangeira), ocorrências calculadas (não gravadas),
+   `transactions.recurrence_id + recurrence_date` com índice único parcial (a mesma ocorrência não é lançada duas
+   vezes; cancelado libera), `recurrence_skips` (pular mês), candidatos a duplicado (mesmo tipo, ±7 dias, ±25%,
+   mesma conta/cartão ou descrição parecida) e vínculo de lançamento existente, `GET /api/transactions/similar`
+   (checagem de duplicado antes de gravar), reserva de limite da próxima cobrança na fatura aberta e previsão do
+   fim do mês com as recorrências em conta. Compras que não reservam limite ficam fora do cálculo do limite por
+   inteiro (nem consomem o saldo credor que passa para a fatura seguinte).
 4. **Tokens + API externa:** PAT, `external-api`, `/api/internal`, lotes de importação, idempotência, revisão e desfazer.
 5. **MCP:** servidor MCP remoto + autenticação (OAuth, se confirmado).
 6. Relatórios, orçamento, exportação LGPD, 2FA.
