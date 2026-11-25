@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Gerencia o ControleFin (PostgreSQL + API + API externa + Web + gateway nginx) via Docker Compose.
-# Uso: ./controlefin.sh {start|stop|restart|status|logs|update|backup|restore} [args]
+# Uso: ./controlefin.sh {init|start|stop|restart|status|logs|update|backup|restore} [args]
 set -euo pipefail
 
 cd "$(dirname "$(readlink -f "$0")")"
@@ -69,6 +69,12 @@ ensure_env() {
     return
   fi
   info "Criando .env com senhas aleatórias"
+  # Na VPS com Traefik (rede "proxy" já existe), o .env nasce publicando pelo domínio; senão, modo local.
+  local traefik=false
+  if docker network inspect proxy >/dev/null 2>&1; then
+    traefik=true
+    info "Rede 'proxy' do Traefik encontrada: publicando em https://controlefin.gkodex.cloud"
+  fi
   umask 077
   cat > .env <<EOF
 POSTGRES_USER=controlefin
@@ -99,7 +105,7 @@ NGINX_FORCE_HTTPS=false
 BACKEND_REPLICAS=1
 
 # Traefik (veja o README): true = o Traefik do servidor encaminha APP_DOMAIN para o gateway
-TRAEFIK_ENABLED=false
+TRAEFIK_ENABLED=${traefik}
 APP_DOMAIN=controlefin.gkodex.cloud
 TRAEFIK_NETWORK=proxy
 TRAEFIK_CERTRESOLVER=letsencrypt
@@ -158,11 +164,22 @@ wait_until_ready() {
   fail "A API não respondeu pelo gateway. Veja os logs: ./controlefin.sh logs nginx (ou backend)"
 }
 
+cmd_init() {
+  check_requirements
+  ensure_env
+  ensure_env_keys
+  load_env
+  check_requirements
+  ok ".env pronto. Confira TRAEFIK_ENABLED/APP_DOMAIN e rode: ./controlefin.sh start"
+}
+
 cmd_start() {
   check_requirements
   ensure_env
   ensure_env_keys
   load_env
+  # Revalida com o .env carregado (ex.: rede do Traefik quando o .env acabou de ser criado).
+  check_requirements
   # Endereço público usado pelo conector do Claude (OAuth e links de envio).
   if [[ -z "${MCP_PUBLIC_URL:-}" ]]; then
     MCP_PUBLIC_URL=$(public_url)
@@ -256,11 +273,12 @@ usage() {
   cat <<EOF
 Uso: ./controlefin.sh <comando>
 
+  init             Só cria o .env (senhas e chaves aleatórias), sem subir nada
   start            Cria o .env (se não existir), constrói e sobe tudo
   stop             Para os serviços (mantém os dados)
   restart          stop + start
   status           Mostra o estado dos containers
-  logs [serviço]   Acompanha os logs (nginx, backend, external-api, frontend, postgres)
+  logs [serviço]   Acompanha os logs (nginx, backend, external-api, mcp-server, frontend, postgres)
   update           Backup + git pull + rebuild
   backup           Backup criptografado do banco em ${BACKUP_DIR}/
   restore <arq>    Restaura um backup (substitui os dados)
@@ -268,6 +286,7 @@ EOF
 }
 
 case "${1:-}" in
+  init)    cmd_init ;;
   start)   cmd_start ;;
   stop)    cmd_stop ;;
   restart) cmd_stop; cmd_start ;;

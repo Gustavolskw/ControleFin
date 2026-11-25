@@ -107,10 +107,13 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 
 ## Produção (mesmo servidor do Chama&Essencia, outro subdomínio)
 
+**Primeira instalação na VPS, passo a passo:** [`docs/INSTALACAO.md`](docs/INSTALACAO.md).
+
 ```bash
 git clone <repo> controlefin && cd controlefin
 chmod +x controlefin.sh
-./controlefin.sh start        # cria o .env com segredos aleatórios na primeira vez
+./controlefin.sh init         # só cria o .env (senhas/chaves); com a rede "proxy" do Traefik já liga o domínio
+./controlefin.sh start        # constrói e sobe (também cria o .env, se não existir)
 ```
 
 Atrás do Traefik (recomendado, compartilhado com os outros sistemas):
@@ -125,6 +128,7 @@ volume `<pasta>_pg-data`. No modo standalone (sem Traefik) o gateway publica `80
 
 | Comando | O que faz |
 |---|---|
+| `./controlefin.sh init` | Só cria o `.env` (senhas e chaves aleatórias), sem subir nada |
 | `./controlefin.sh start` / `stop` / `restart` / `status` | Sobe, para, reinicia, mostra estado |
 | `./controlefin.sh logs [nginx\|backend\|external-api\|mcp-server\|frontend\|postgres]` | Logs |
 | `./controlefin.sh update` | backup + `git pull` + rebuild (as migrações do banco rodam sozinhas) |
