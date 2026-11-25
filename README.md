@@ -14,8 +14,10 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 | Tela | O que faz |
 |---|---|
 | **Painel** | Saldo total de todas as contas (PF + PJ + benefícios), previsão no fim do mês, receitas/despesas do mês, saldo por conta e por carteira, despesas por categoria. |
-| **Lançamentos** | Receitas, despesas, transferências entre carteiras e ajustes; filtros por mês, conta, tipo, situação, categoria e texto; confirmar pendentes. |
+| **Lançamentos** | Receitas, despesas (em conta, cartão de crédito, débito ou voucher), transferências e ajustes; parcelas, moeda estrangeira (cotação + IOF), "reserva o limite"; estornar; filtros por mês, conta, cartão, tipo, situação, categoria e texto. |
 | **Contas** | Contas (corrente, digital, benefício…) com uma ou mais **carteiras** de saldo próprio (ex.: Wiipo "Livre" e "VA/VR"); ajuste de saldo pelo valor real do banco. |
+| **Cartões** | Cartões de crédito (limite compartilhado pelos cartões físico e digitais, fechamento e vencimento), débito e voucher alimentação; limite usado/disponível; fatura aberta e fatura a pagar. |
+| **Faturas** | Fatura por mês: compras, parcelas, estornos e pagamentos; pagar (parcial ou total) e estornar compras. |
 | **Categorias** | Categorias de despesa/receita com subcategorias (padrões criados no primeiro acesso). |
 | **Administração** | (só admin) convites e ativação de contas — sem acesso a dados financeiros. |
 | **Meu perfil** | Troca de senha (encerra as outras sessões) e das perguntas de segurança. |
@@ -27,6 +29,15 @@ Traefik (produção). Mesmo padrão de operação do Chama&Essencia.
 - **Transferência** entre carteiras próprias não é receita nem despesa. **Pendente** e **cancelado** não afetam saldo.
 - **Previsão no fim do mês** inclui os lançamentos confirmados com data futura dentro do mês (ex.: assinatura dia 30).
 - **Ajustar saldo**: informe o saldo real; o sistema lança um AJUSTE com a diferença.
+- **Compra no crédito** não mexe no saldo: entra na fatura do mês pela data (no dia do fechamento ou depois, vai
+  para a próxima). Conta como despesa do mês na data da compra (cada parcela na data dela).
+- **Parcelado**: uma parcela por fatura; ocupa o limite inteiro e libera conforme as faturas são pagas.
+- **Reserva o limite** desmarcado (ex.: assinatura do Claude): entra na fatura, mas não ocupa o limite.
+- **Pagamento de fatura** sai da carteira e abate a fatura; não é despesa (as compras já contaram). Pago a mais vira
+  crédito na fatura seguinte.
+- **Estornar** nunca apaga: o que ainda não fechou é cancelado; o que já foi cobrado volta como ESTORNO (crédito na
+  fatura aberta ou entrada na carteira, no débito).
+- **Faturas a pagar** (painel) = faturas fechadas não pagas + fatura aberta de cada cartão (sem parcelas futuras).
 - Dinheiro sempre `NUMERIC(19,2)` / `BigDecimal`, arredondamento bancário (HALF_EVEN).
 
 ## Arquitetura
@@ -123,9 +134,9 @@ services:
 
 ```
 backend/       auth (login, convites, perguntas) · admin · user · finance (contas, carteiras, categorias, lançamentos,
-               painel) · config (JWT, filtros, RLS) · db/migration (Flyway)
+               cartões, faturas, painel) · config (JWT, filtros, RLS) · db/migration (Flyway)
 external-api/  API pública para o MCP (sem banco)
-frontend/      pages/ painel, lançamentos, contas, categorias, perfil, administração, login/cadastro/recuperação
+frontend/      pages/ painel, lançamentos, contas, cartões, faturas, categorias, perfil, administração, login/cadastro/recuperação
 docker/nginx/  gateway (TLS, rate limit, bloqueio de /api/internal, headers de segurança)
 docs/          análise e decisões
 ```

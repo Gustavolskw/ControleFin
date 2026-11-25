@@ -179,10 +179,17 @@ import_batches (user_id, origem, token_id, status, criado_em, resumo)
 
 ## 7. Fases sugeridas
 
+Situação: fases 0, 1 e 2 **concluídas**.
+
 0. **Infra + Auth:** monorepo, compose (postgres, backend, frontend, nginx, traefik), `controlefin.sh`,
    login/convite/perguntas/primeiro acesso/bloqueio (portado da referência) + isolamento por usuário.
 1. **Contas:** instituições, contas, saldo inicial, categorias, receitas/despesas, transferências, painel consolidado.
 2. **Cartões:** linhas de crédito, cartões físicos/virtuais, faturas, parcelamento, pagamento de fatura, moeda estrangeira.
+   Implementado: limite compartilhado (`credit_lines`), cartões (`cards`), faturas (`invoices`, mês do vencimento;
+   compra no dia do fechamento vai para a próxima), parcelas (uma linha por parcela, centavo da divisão na 1ª),
+   `consumes_limit`, câmbio (moeda, valor, cotação, IOF), PAGAMENTO_FATURA (parcial ou total; não é despesa),
+   ESTORNO (nunca apaga: cancela o que não fechou, devolve como crédito o que já foi cobrado), saldo credor levado
+   para a fatura seguinte. Sem juros/rotativo: fatura não paga fica "Vencida" na própria fatura.
 3. **Recorrências:** previsto × realizado, reserva de limite, painel de compromissos.
 4. **Tokens + API externa:** PAT, `external-api`, `/api/internal`, lotes de importação, idempotência, revisão e desfazer.
 5. **MCP:** servidor MCP remoto + autenticação (OAuth, se confirmado).

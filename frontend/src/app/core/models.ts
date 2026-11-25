@@ -104,11 +104,12 @@ export interface CategoryRequest {
 
 // ------------------------------------------------------------------ lançamentos
 
-export type TransactionKind = 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA' | 'AJUSTE';
+export type TransactionKind = 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA' | 'AJUSTE' | 'PAGAMENTO_FATURA' | 'ESTORNO';
 export type TransactionStatus = 'CONFIRMADO' | 'PENDENTE' | 'CANCELADO';
 
 export const KIND_LABEL: Record<TransactionKind, string> = {
   RECEITA: 'Receita', DESPESA: 'Despesa', TRANSFERENCIA: 'Transferência', AJUSTE: 'Ajuste',
+  PAGAMENTO_FATURA: 'Pagamento de fatura', ESTORNO: 'Estorno',
 };
 export const STATUS_LABEL: Record<TransactionStatus, string> = {
   CONFIRMADO: 'Confirmado', PENDENTE: 'Pendente', CANCELADO: 'Cancelado',
@@ -121,10 +122,10 @@ export interface Transaction {
   date: string;
   description: string;
   amount: number;
-  walletId: string;
-  walletName: string;
-  accountId: string;
-  accountName: string;
+  walletId: string | null;
+  walletName: string | null;
+  accountId: string | null;
+  accountName: string | null;
   targetWalletId: string | null;
   targetWalletName: string | null;
   targetAccountName: string | null;
@@ -134,6 +135,21 @@ export interface Transaction {
   origin: 'WEB' | 'API';
   createdAt: string;
   updatedAt: string;
+  cardId: string | null;
+  cardName: string | null;
+  creditLineId: string | null;
+  creditLineName: string | null;
+  invoiceId: string | null;
+  invoiceReference: string | null;
+  consumesLimit: boolean;
+  installmentGroup: string | null;
+  installmentNumber: number | null;
+  installmentCount: number | null;
+  originalCurrency: string | null;
+  originalAmount: number | null;
+  exchangeRate: number | null;
+  iof: number | null;
+  reversalOf: string | null;
 }
 
 export interface TransactionRequest {
@@ -141,11 +157,20 @@ export interface TransactionRequest {
   status: TransactionStatus;
   date: string;
   description: string;
-  amount: number;
-  walletId: string;
+  amount: number | null;
+  walletId: string | null;
   targetWalletId: string | null;
   categoryId: string | null;
   notes: string | null;
+  cardId?: string | null;
+  credit?: boolean | null;
+  installments?: number | null;
+  consumesLimit?: boolean | null;
+  invoiceId?: string | null;
+  originalCurrency?: string | null;
+  originalAmount?: number | null;
+  exchangeRate?: number | null;
+  iof?: number | null;
 }
 
 export interface TransactionFilter {
@@ -157,6 +182,94 @@ export interface TransactionFilter {
   kind?: TransactionKind | '';
   status?: TransactionStatus | '';
   q?: string;
+  cardId?: string;
+  creditLineId?: string;
+}
+
+// ------------------------------------------------------------------ cartões, limites e faturas
+
+export type CardFormat = 'FISICO' | 'DIGITAL';
+export type CardFunction = 'CREDITO_DEBITO' | 'SO_DEBITO' | 'VOUCHER_ALIMENTACAO';
+export type InvoiceStatus = 'ABERTA' | 'FUTURA' | 'FECHADA' | 'VENCIDA' | 'PAGA';
+
+export const FORMAT_LABEL: Record<CardFormat, string> = { FISICO: 'Físico', DIGITAL: 'Digital' };
+export const FUNCTION_LABEL: Record<CardFunction, string> = {
+  CREDITO_DEBITO: 'Crédito e débito', SO_DEBITO: 'Só débito', VOUCHER_ALIMENTACAO: 'Voucher alimentação',
+};
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  ABERTA: 'Aberta', FUTURA: 'Futura', FECHADA: 'Fechada', VENCIDA: 'Vencida', PAGA: 'Paga',
+};
+
+export interface Card {
+  id: string;
+  name: string;
+  format: CardFormat;
+  function: CardFunction;
+  creditLineId: string | null;
+  creditLineName: string | null;
+  walletId: string | null;
+  walletName: string | null;
+  accountName: string | null;
+  archived: boolean;
+}
+
+export interface CardRequest {
+  name: string;
+  format: CardFormat;
+  function: CardFunction;
+  creditLineId: string | null;
+  walletId: string | null;
+  archived: boolean;
+}
+
+export interface InvoiceSummary {
+  id: string;
+  creditLineId: string;
+  creditLineName: string;
+  reference: string;
+  closingDate: string;
+  dueDate: string;
+  status: InvoiceStatus;
+  total: number;
+  paid: number;
+  outstanding: number;
+  nonConsuming: number;
+  /** Crédito vindo da fatura anterior (pago a mais). */
+  carriedCredit: number;
+}
+
+export interface InvoiceDetail {
+  invoice: InvoiceSummary;
+  items: Transaction[];
+}
+
+export interface CreditLine {
+  id: string;
+  name: string;
+  color: string | null;
+  limit: number;
+  closingDay: number;
+  dueDay: number;
+  paymentWalletId: string | null;
+  paymentWalletName: string | null;
+  archived: boolean;
+  used: number;
+  available: number;
+  cards: Card[];
+  currentInvoice: InvoiceSummary | null;
+  dueInvoice: InvoiceSummary | null;
+  toPay: number;
+}
+
+export interface CreditLineRequest {
+  name: string;
+  color: string | null;
+  limit: number;
+  closingDay: number;
+  dueDay: number;
+  paymentWalletId: string | null;
+  archived: boolean;
+  cards?: { name: string; format: CardFormat; walletId: string | null }[];
 }
 
 // ------------------------------------------------------------------ painel
@@ -185,6 +298,8 @@ export interface Dashboard {
   accounts: BankAccount[];
   month: MonthSummary;
   pendingCount: number;
+  invoicesToPay: number;
+  creditLines: CreditLine[];
 }
 
 // ------------------------------------------------------------------ administração

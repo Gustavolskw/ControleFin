@@ -26,6 +26,7 @@ import com.controlefin.finance.FinanceDtos.AdjustRequest;
 import com.controlefin.finance.FinanceDtos.CategoryRequest;
 import com.controlefin.finance.FinanceDtos.CategoryResponse;
 import com.controlefin.finance.FinanceDtos.DashboardResponse;
+import com.controlefin.finance.FinanceDtos.ReverseRequest;
 import com.controlefin.finance.FinanceDtos.TransactionFilter;
 import com.controlefin.finance.FinanceDtos.TransactionRequest;
 import com.controlefin.finance.FinanceDtos.TransactionResponse;
@@ -148,9 +149,11 @@ public class FinanceController {
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) TransactionKind kind,
             @RequestParam(required = false) TransactionStatus status,
-            @RequestParam(required = false) String q) {
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID cardId,
+            @RequestParam(required = false) UUID creditLineId) {
         return transactions.list(CurrentUser.id(),
-                new TransactionFilter(from, to, accountId, walletId, categoryId, kind, status, q));
+                new TransactionFilter(from, to, accountId, walletId, categoryId, kind, status, q, cardId, creditLineId));
     }
 
     @GetMapping("/transactions/{id}")
@@ -167,6 +170,12 @@ public class FinanceController {
     @PutMapping("/transactions/{id}")
     public TransactionResponse updateTransaction(@PathVariable UUID id, @Valid @RequestBody TransactionRequest req) {
         return transactions.update(CurrentUser.id(), id, req);
+    }
+
+    /** Estorna/cancela uma compra (nunca apaga). */
+    @PostMapping("/transactions/{id}/reverse")
+    public TransactionResponse reverseTransaction(@PathVariable UUID id, @RequestBody(required = false) ReverseRequest req) {
+        return transactions.reverse(CurrentUser.id(), id, req);
     }
 
     @DeleteMapping("/transactions/{id}")

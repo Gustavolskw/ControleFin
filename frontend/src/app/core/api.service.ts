@@ -3,8 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TokenResponse } from './auth.service';
 import {
-  Account, AccountRequest, AdminUser, BankAccount, Category, CategoryRequest, Dashboard, InviteInfo, NewInvite,
-  QuestionAnswer, Transaction, TransactionFilter, TransactionRequest, WalletRequest,
+  Account, AccountRequest, AdminUser, BankAccount, Card, CardRequest, Category, CategoryRequest, CreditLine,
+  CreditLineRequest, Dashboard, InviteInfo, InvoiceDetail, InvoiceSummary, NewInvite, QuestionAnswer, Transaction,
+  TransactionFilter, TransactionRequest, WalletRequest,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -97,6 +98,52 @@ export class ApiService {
 
   deleteTransaction(id: string): Observable<void> {
     return this.http.delete<void>(`/api/transactions/${id}`);
+  }
+
+  /** Estorna/cancela uma compra (nunca apaga). */
+  reverseTransaction(id: string, date: string | null = null): Observable<Transaction> {
+    return this.http.post<Transaction>(`/api/transactions/${id}/reverse`, { date });
+  }
+
+  // --- cartões, limites e faturas
+  creditLines(): Observable<CreditLine[]> {
+    return this.http.get<CreditLine[]>('/api/credit-lines');
+  }
+
+  createCreditLine(req: CreditLineRequest): Observable<CreditLine> {
+    return this.http.post<CreditLine>('/api/credit-lines', req);
+  }
+
+  updateCreditLine(id: string, req: CreditLineRequest): Observable<CreditLine> {
+    return this.http.put<CreditLine>(`/api/credit-lines/${id}`, req);
+  }
+
+  deleteCreditLine(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/credit-lines/${id}`);
+  }
+
+  invoices(creditLineId: string): Observable<InvoiceSummary[]> {
+    return this.http.get<InvoiceSummary[]>(`/api/credit-lines/${creditLineId}/invoices`);
+  }
+
+  invoice(id: string): Observable<InvoiceDetail> {
+    return this.http.get<InvoiceDetail>(`/api/invoices/${id}`);
+  }
+
+  cards(): Observable<Card[]> {
+    return this.http.get<Card[]>('/api/cards');
+  }
+
+  createCard(req: CardRequest): Observable<Card> {
+    return this.http.post<Card>('/api/cards', req);
+  }
+
+  updateCard(id: string, req: CardRequest): Observable<Card> {
+    return this.http.put<Card>(`/api/cards/${id}`, req);
+  }
+
+  deleteCard(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/cards/${id}`);
   }
 
   // --- administração (somente admin)

@@ -22,11 +22,14 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
 
     boolean existsByAccountIdAndNameIgnoreCaseAndIdNot(UUID accountId, String name, UUID id);
 
-    /** Saldo de cada carteira até a data: inicial + lançamentos CONFIRMADOS (entradas, saídas e transferências). */
+    /**
+     * Saldo de cada carteira até a data: inicial + lançamentos CONFIRMADOS na carteira (entradas, saídas,
+     * transferências e pagamentos de fatura). Compras no crédito não têm carteira e não entram.
+     */
     @Query(value = """
             select w.id as walletId,
                    w.initial_balance
-                   + coalesce((select sum(case when t.kind in ('RECEITA', 'AJUSTE') then t.amount else -t.amount end)
+                   + coalesce((select sum(case when t.kind in ('RECEITA', 'AJUSTE', 'ESTORNO') then t.amount else -t.amount end)
                                from transactions t
                                where t.wallet_id = w.id and t.status = 'CONFIRMADO' and t.date <= :asOf), 0)
                    + coalesce((select sum(t.amount)

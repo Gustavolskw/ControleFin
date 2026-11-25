@@ -2,14 +2,15 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { errorMessage } from '../core/auth.interceptor';
-import { BrlPipe, currentMonth } from '../core/format';
-import { Dashboard, accountTypeLabel } from '../core/models';
+import { BrlPipe, DateBrPipe, currentMonth } from '../core/format';
+import { Dashboard, INVOICE_STATUS_LABEL, accountTypeLabel } from '../core/models';
+import { LimitMeterComponent } from '../shared/limit-meter.component';
 import { MonthPickerComponent } from '../shared/month-picker.component';
 
 /** Painel: saldo total de todas as contas, por conta/carteira e resumo do mês. */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, BrlPipe, MonthPickerComponent],
+  imports: [RouterLink, BrlPipe, DateBrPipe, LimitMeterComponent, MonthPickerComponent],
   template: `
     <div class="page-head">
       <h1>Painel</h1>
@@ -34,6 +35,13 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
           <div class="value">{{ d.projectedEndOfMonth | brl }}</div>
           <div class="detail">com lançamentos já agendados</div>
         </div>
+        @if (d.creditLines.length > 0) {
+          <div class="kpi">
+            <div class="label">Faturas a pagar</div>
+            <div class="value neg">{{ d.invoicesToPay | brl }}</div>
+            <div class="detail">Saldo após faturas: <span [class.neg]="d.total - d.invoicesToPay < 0">{{ d.total - d.invoicesToPay | brl }}</span></div>
+          </div>
+        }
         <div class="kpi">
           <div class="label">Receitas no mês</div>
           <div class="value pos">{{ d.month.income | brl }}</div>
@@ -73,6 +81,28 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
           </div>
         </section>
 
+        <section class="side">
+        @if (d.creditLines.length > 0) {
+          <section class="card">
+            <div class="section-head"><h2>Cartões de crédito</h2><a routerLink="/cartoes" class="btn ghost small">Gerenciar</a></div>
+            <ul class="lines">
+              @for (l of d.creditLines; track l.id) {
+                <li>
+                  <a class="line-title" [routerLink]="['/cartoes', l.id, 'faturas']">
+                    <strong>{{ l.name }}</strong>
+                    @if (l.dueInvoice; as inv) {
+                      <span class="tag" [class.danger]="inv.status === 'VENCIDA'" [class.warn]="inv.status === 'FECHADA'">
+                        {{ statusLabel[inv.status] }} {{ inv.outstanding | brl }} · vence {{ inv.dueDate | dateBr }}</span>
+                    } @else if (l.currentInvoice) {
+                      <span class="muted small">Fatura atual {{ l.currentInvoice.total | brl }} · vence {{ l.currentInvoice.dueDate | dateBr }}</span>
+                    }
+                  </a>
+                  <app-limit-meter [used]="l.used" [limit]="l.limit" [available]="l.available" />
+                </li>
+              }
+            </ul>
+          </section>
+        }
         <section class="card">
           <h2>Despesas por categoria</h2>
           @if (d.month.expensesByCategory.length === 0) {
@@ -87,6 +117,7 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
               }
             </ul>
           }
+        </section>
         </section>
       </div>
     } @else if (!error()) {
@@ -110,6 +141,11 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
     .track { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
     .fill { height: 100%; background: var(--brand); border-radius: 4px; min-width: 2px; }
     .bars li:hover .fill { background: var(--brand-strong); }
+    .side { display: grid; gap: 16px; }
+    .lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+    .line-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 6px; color: var(--text); text-decoration: none; }
+    .line-title:hover strong { text-decoration: underline; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
   `,
 })
@@ -120,6 +156,7 @@ export class DashboardComponent {
   data = signal<Dashboard | null>(null);
   error = signal('');
   readonly typeLabel = accountTypeLabel;
+  readonly statusLabel = INVOICE_STATUS_LABEL;
 
   activeAccounts = computed(() => (this.data()?.accounts ?? []).filter(a => !a.archived));
   private maxExpense = computed(() => Math.max(0, ...(this.data()?.month.expensesByCategory ?? []).map(c => c.amount)));

@@ -31,11 +31,14 @@ public class AccountService {
     private final AccountRepository accounts;
     private final WalletRepository wallets;
     private final TransactionRepository transactions;
+    private final CardRepository cards;
 
-    public AccountService(AccountRepository accounts, WalletRepository wallets, TransactionRepository transactions) {
+    public AccountService(AccountRepository accounts, WalletRepository wallets, TransactionRepository transactions,
+                          CardRepository cards) {
         this.accounts = accounts;
         this.wallets = wallets;
         this.transactions = transactions;
+        this.cards = cards;
     }
 
     @Transactional(readOnly = true)
@@ -104,6 +107,9 @@ public class AccountService {
             if (transactions.walletInUse(userId, w.getId())) {
                 throw ApiException.badRequest("Esta conta tem lançamentos. Arquive-a em vez de excluir.");
             }
+            if (cards.existsByUserIdAndWalletId(userId, w.getId())) {
+                throw ApiException.badRequest("Esta conta tem cartões ligados. Remova ou mude os cartões antes.");
+            }
         }
         accounts.delete(account);
     }
@@ -143,6 +149,9 @@ public class AccountService {
         Wallet wallet = wallet(userId, walletId);
         if (transactions.walletInUse(userId, walletId)) {
             throw ApiException.badRequest("Esta carteira tem lançamentos. Arquive-a em vez de excluir.");
+        }
+        if (cards.existsByUserIdAndWalletId(userId, walletId)) {
+            throw ApiException.badRequest("Esta carteira tem cartões ligados. Remova ou mude os cartões antes.");
         }
         if (wallets.findByUserIdAndAccountIdOrderByPositionAscNameAsc(userId, wallet.getAccountId()).size() <= 1) {
             throw ApiException.badRequest("A conta precisa ter pelo menos uma carteira.");

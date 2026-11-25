@@ -31,15 +31,18 @@ public class DashboardService {
     private final AccountService accountService;
     private final TransactionRepository transactions;
     private final CategoryRepository categories;
+    private final CardService cardService;
 
     public DashboardService(AccountService accountService, TransactionRepository transactions,
-                            CategoryRepository categories) {
+                            CategoryRepository categories, CardService cardService) {
         this.accountService = accountService;
         this.transactions = transactions;
         this.categories = categories;
+        this.cardService = cardService;
     }
 
-    @Transactional(readOnly = true)
+    /** Lê e, se faltar, cria a fatura aberta de cada cartão (por isso não é somente leitura). */
+    @Transactional
     public DashboardResponse dashboard(UUID userId, YearMonth month) {
         LocalDate today = Money.today();
         YearMonth ym = month == null ? YearMonth.from(today) : month;
@@ -56,8 +59,10 @@ public class DashboardService {
         BigDecimal projected = accountService.balances(userId, endOfMonth).values().stream()
                 .reduce(Money.nz(null), BigDecimal::add);
 
+        var lines = cardService.listCreditLines(userId).stream().filter(l -> !l.archived()).toList();
         return new DashboardResponse(today, total, pf, pj, projected, accounts, summary(userId, ym),
-                transactions.countByUserIdAndStatus(userId, TransactionStatus.PENDENTE));
+                transactions.countByUserIdAndStatus(userId, TransactionStatus.PENDENTE), CardService.toPay(lines),
+                lines);
     }
 
     MonthSummary summary(UUID userId, YearMonth ym) {
@@ -76,6 +81,10 @@ public class DashboardService {
             if (row.getKind() == TransactionKind.RECEITA) {
                 income.merge(key, value, BigDecimal::add);
                 totalIncome = totalIncome.add(value);
+            } else if (row.getKind() == TransactionKind.ESTORNO) {
+                // Estorno abate a despesa da categoria.
+                expenses.merge(key, value.negate(), BigDecimal::add);
+                totalExpense = totalExpense.subtract(value);
             } else {
                 expenses.merge(key, value, BigDecimal::add);
                 totalExpense = totalExpense.add(value);
@@ -91,6 +100,7 @@ public class DashboardService {
             Category c = id == null ? null : byId.get(id);
             list.add(new CategoryTotal(id, c == null ? "Sem categoria" : c.getName(), amount));
         });
+        list.removeIf(c -> c.amount().signum() == 0);
         list.sort(Comparator.comparing(CategoryTotal::amount).reversed());
         return list;
     }

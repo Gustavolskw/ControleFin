@@ -44,7 +44,10 @@ class TransactionRulesTest {
         wallets = mock(WalletRepository.class);
         categories = mock(CategoryRepository.class);
         AccountRepository accounts = mock(AccountRepository.class);
-        service = new TransactionService(transactions, wallets, accounts, categories);
+        InvoiceRepository invoices = mock(InvoiceRepository.class);
+        CreditLineRepository lines = mock(CreditLineRepository.class);
+        service = new TransactionService(transactions, wallets, accounts, categories, mock(CardRepository.class),
+                lines, invoices, new InvoiceService(invoices, lines));
 
         UUID accountId = UUID.randomUUID();
         wallet = withId(new Wallet(me, accountId));
@@ -62,11 +65,11 @@ class TransactionRulesTest {
         when(categories.findByIdAndUserId(income.getId(), me)).thenReturn(Optional.of(income));
         when(wallets.findByUserIdOrderByPositionAscNameAsc(me)).thenReturn(List.of(wallet, wallet2));
         when(categories.findByUserIdOrderByNameAsc(me)).thenReturn(List.of(expense, income));
-        when(transactions.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(transactions.saveAllAndFlush(any())).thenAnswer(i -> i.getArgument(0));
     }
 
     private TransactionRequest req(TransactionKind kind, String amount, UUID walletId, UUID target, UUID category) {
-        return new TransactionRequest(kind, null, LocalDate.of(2026, 11, 10), "Teste", new BigDecimal(amount),
+        return TransactionRequest.simple(kind, null, LocalDate.of(2026, 11, 10), "Teste", new BigDecimal(amount),
                 walletId, target, category, null);
     }
 
