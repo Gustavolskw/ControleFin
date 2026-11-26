@@ -87,7 +87,14 @@ public class ProxyController {
             route("POST", "/recurrences/" + UUID + "/occurrences/" + DATE + "/skip"),
             route("POST", "/recurrences/" + UUID + "/occurrences/" + DATE + "/unskip"),
             route("GET", "/recurrences/" + UUID + "/occurrences/" + DATE + "/candidates"),
-            route("PUT", "/transactions/" + UUID + "/recurrence"));
+            route("PUT", "/transactions/" + UUID + "/recurrence"),
+            // investimentos: consultar, criar, editar e registrar movimentos (sem exclusão)
+            route("GET", "/investments"),
+            route("GET", "/investments/" + UUID),
+            route("POST", "/investments"),
+            route("PUT", "/investments/" + UUID),
+            route("POST", "/investments/" + UUID + "/movements"),
+            route("PUT", "/investments/" + UUID + "/movements/" + UUID));
 
     private static Route route(String method, String regex) {
         return new Route(method, Pattern.compile(regex));

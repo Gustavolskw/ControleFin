@@ -308,7 +308,7 @@ interface WalletOption { id: string; label: string; }
     .card-row { display: grid; grid-template-columns: 1fr 110px 1fr 34px; gap: 8px; margin-bottom: 8px; }
     tr.muted td { color: var(--muted); }
     @media (max-width: 700px) {
-      .wide { display: none; }
+      th.wide, td.wide { display: none; }
       .card-row { grid-template-columns: 1fr 34px; }
       .card-row select { grid-column: 1; }
     }

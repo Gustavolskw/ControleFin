@@ -36,6 +36,17 @@ class ProxyControllerTest {
         }
         assertFalse(ProxyController.allowed("DELETE", "/recurrences/" + ID + "/skips/2026-12-05"));
         assertFalse(ProxyController.allowed("POST", "/recurrences/" + ID + "/occurrences/12-2026/skip"));
+        assertFalse(ProxyController.allowed("DELETE", "/investments/" + ID));
+        assertFalse(ProxyController.allowed("DELETE", "/investments/" + ID + "/movements/" + ID));
+    }
+
+    @Test
+    void investimentos() {
+        assertTrue(ProxyController.allowed("GET", "/investments"));
+        assertTrue(ProxyController.allowed("POST", "/investments"));
+        assertTrue(ProxyController.allowed("PUT", "/investments/" + ID));
+        assertTrue(ProxyController.allowed("POST", "/investments/" + ID + "/movements"));
+        assertTrue(ProxyController.allowed("PUT", "/investments/" + ID + "/movements/" + ID));
     }
 
     @Test

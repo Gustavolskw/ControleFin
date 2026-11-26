@@ -33,10 +33,12 @@ public class AccountService {
     private final TransactionRepository transactions;
     private final CardRepository cards;
     private final RecurrenceRepository recurrences;
+    private final InvestmentRepository investments;
 
     public AccountService(AccountRepository accounts, WalletRepository wallets, TransactionRepository transactions,
-                          CardRepository cards, RecurrenceRepository recurrences) {
+                          CardRepository cards, RecurrenceRepository recurrences, InvestmentRepository investments) {
         this.recurrences = recurrences;
+        this.investments = investments;
         this.accounts = accounts;
         this.wallets = wallets;
         this.transactions = transactions;
@@ -105,6 +107,9 @@ public class AccountService {
     @Transactional
     public void delete(UUID userId, UUID id) {
         Account account = account(userId, id);
+        if (investments.existsByUserIdAndAccountId(userId, id)) {
+            throw ApiException.badRequest("Esta conta é a instituição de um investimento. Mude o investimento antes.");
+        }
         for (Wallet w : wallets.findByUserIdAndAccountIdOrderByPositionAscNameAsc(userId, id)) {
             if (transactions.walletInUse(userId, w.getId())) {
                 throw ApiException.badRequest("Esta conta tem lançamentos. Arquive-a em vez de excluir.");
@@ -114,6 +119,9 @@ public class AccountService {
             }
             if (recurrences.existsByUserIdAndWalletId(userId, w.getId())) {
                 throw ApiException.badRequest("Esta conta é usada por uma recorrência. Mude a recorrência antes.");
+            }
+            if (investments.existsByUserIdAndWalletId(userId, w.getId())) {
+                throw ApiException.badRequest("Esta conta é usada por um investimento. Mude o investimento antes.");
             }
         }
         accounts.delete(account);
@@ -160,6 +168,9 @@ public class AccountService {
         }
         if (recurrences.existsByUserIdAndWalletId(userId, walletId)) {
             throw ApiException.badRequest("Esta carteira é usada por uma recorrência. Mude a recorrência antes.");
+        }
+        if (investments.existsByUserIdAndWalletId(userId, walletId)) {
+            throw ApiException.badRequest("Esta carteira é usada por um investimento. Mude o investimento antes.");
         }
         if (wallets.findByUserIdAndAccountIdOrderByPositionAscNameAsc(userId, wallet.getAccountId()).size() <= 1) {
             throw ApiException.badRequest("A conta precisa ter pelo menos uma carteira.");

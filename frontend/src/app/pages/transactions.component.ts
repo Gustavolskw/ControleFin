@@ -119,6 +119,7 @@ interface CategoryGroup { parent: Category; children: Category[]; }
                 @if (t.kind !== 'RECEITA' && t.kind !== 'DESPESA') { <span class="tag" [class.ok]="t.kind === 'ESTORNO'">{{ kindLabel[t.kind] }}</span> }
                 @if (t.originalCurrency) { <span class="tag">{{ t.originalCurrency }} {{ t.originalAmount }}</span> }
                 @if (t.recurrenceId) { <span class="tag accent" title="Lançamento de uma recorrência">Recorrente</span> }
+                @if (t.investmentId) { <span class="tag accent" title="Gerado por um investimento: altere pela tela Investimentos">Investimento</span> }
                 @if (t.origin === 'API') { <span class="tag accent" title="Enviado pelo Claude (API externa)">Claude</span> }
                 <div class="meta muted">{{ where(t) }}@if (t.categoryName) { · {{ t.categoryName }} }</div>
               </td>
@@ -132,7 +133,7 @@ interface CategoryGroup { parent: Category; children: Category[]; }
               </td>
               <td class="actions wide" (click)="$event.stopPropagation()">
                 @if (t.status === 'PENDENTE') { <button class="btn small" type="button" (click)="confirmTx(t)">Confirmar</button> }
-                <button class="btn ghost small" type="button" (click)="editTx(t)">Editar</button>
+                <button class="btn ghost small" type="button" (click)="editTx(t)">{{ t.investmentId ? 'Ver investimento' : 'Editar' }}</button>
               </td>
             </tr>
           } @empty {
@@ -344,7 +345,7 @@ interface CategoryGroup { parent: Category; children: Category[]; }
     .upload { cursor: pointer; }
     .small { font-size: 12px; }
     @media (max-width: 700px) {
-      .wide { display: none; }
+      th.wide, td.wide { display: none; }
       .meta { display: block; }
       .kpis.small { grid-template-columns: repeat(3, 1fr); gap: 6px; }
       .kpis.small .kpi { padding: 8px; }
@@ -358,7 +359,8 @@ export class TransactionsComponent implements OnInit {
   private router = inject(Router);
 
   readonly kinds: TransactionKind[] = ['DESPESA', 'RECEITA', 'TRANSFERENCIA', 'AJUSTE'];
-  readonly allKinds: TransactionKind[] = ['DESPESA', 'RECEITA', 'TRANSFERENCIA', 'AJUSTE', 'PAGAMENTO_FATURA', 'ESTORNO'];
+  readonly allKinds: TransactionKind[] = ['DESPESA', 'RECEITA', 'TRANSFERENCIA', 'AJUSTE', 'PAGAMENTO_FATURA', 'ESTORNO',
+    'APLICACAO', 'RESGATE'];
   readonly statuses: TransactionStatus[] = ['CONFIRMADO', 'PENDENTE', 'CANCELADO'];
   readonly kindLabel = KIND_LABEL;
   readonly statusLabel = STATUS_LABEL;
@@ -476,8 +478,8 @@ export class TransactionsComponent implements OnInit {
 
   /** +1 entra, −1 sai, 0 neutro (transferência no filtro geral). Compras no crédito aparecem como saída. */
   sign(t: Transaction): number {
-    if (t.kind === 'RECEITA' || t.kind === 'ESTORNO') return 1;
-    if (t.kind === 'DESPESA' || t.kind === 'PAGAMENTO_FATURA') return -1;
+    if (t.kind === 'RECEITA' || t.kind === 'ESTORNO' || t.kind === 'RESGATE') return 1;
+    if (t.kind === 'DESPESA' || t.kind === 'PAGAMENTO_FATURA' || t.kind === 'APLICACAO') return -1;
     if (t.kind === 'AJUSTE') return t.amount >= 0 ? 1 : -1;
     if (this.accountId) {
       const own = this.accounts().find(a => a.id === this.accountId)?.wallets.map(w => w.id) ?? [];
@@ -517,6 +519,10 @@ export class TransactionsComponent implements OnInit {
   }
 
   editTx(t: Transaction): void {
+    if (t.investmentId) {
+      this.router.navigate(['/investimentos'], { queryParams: { id: t.investmentId } });
+      return;
+    }
     this.formError.set('');
     this.editing.set(t);
     this.files.set([]);

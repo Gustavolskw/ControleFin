@@ -49,6 +49,24 @@ Fluxo: **Claude → `https://controlefin.gkodex.cloud/mcp` (servidor MCP) → AP
 | `listar_recorrencias` · `criar_recorrencia` · `editar_recorrencia` | Assinaturas, aluguel, salário |
 | `pular_ocorrencia` · `retomar_ocorrencia` · `candidatos_da_ocorrencia` · `vincular_a_recorrencia` | Ajustes de uma ocorrência |
 
+| `listar_investimentos` · `ver_investimento` · `criar_investimento` · `editar_investimento` | Caixinhas, CDB, Tesouro, ações, FIIs, cripto |
+| `registrar_movimento_investimento` · `editar_movimento_investimento` | Aporte, resgate, compra, venda, proventos e **ganho/perda** (atualização de saldo ou cotação) |
+
+### Investimentos pelo Claude
+
+Exemplos do que dá para pedir:
+
+- **Aporte:** "coloquei R$ 500 na caixinha do Nubank" → aporte saindo da conta.
+- **Ganho ou perda:** "minha previdência rendeu R$ 152" ou "minhas ações caíram R$ 120".
+  - O Claude registra uma atualização com `variation`, e a ferramenta soma esse valor ao valor atual.
+  - Em ações, FIIs e cripto, ela calcula a nova cotação.
+- **Saldo do app:** "o app do banco mostra R$ 9.900 na previdência" → atualização com o saldo informado.
+- **Compra:** "comprei 10 MXRF11 a R$ 10,50 com R$ 0,50 de taxa" → compra; o preço médio é calculado.
+- **Proventos:** "caíram R$ 18,40 de dividendos" → proventos, que entram na conta como receita.
+
+Para o saldo que já existia antes de usar o sistema, o Claude registra um aporte (ou compra) **sem conta**: assim não
+tira dinheiro das contas.
+
 As ferramentas `editar_*` mudam só os campos informados. **Não há exclusão:** o Claude arquiva (`archived=true`) ou
 desativa a recorrência (`active=false`); excluir de verdade é só pelo site.
 

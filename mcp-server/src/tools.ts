@@ -27,10 +27,21 @@ Regras:
 7. Cadastros (contas, carteiras, categorias, limites, cartões, recorrências): consulte a lista antes de criar para não
    duplicar; para mudar, use editar_* (só os campos informados mudam). Não existe exclusão: para tirar de uso, arquive
    (archived=true; recorrência: active=false). Saldo errado numa carteira: ajustar_saldo.
-8. Não há ferramenta de login, cadastro de usuário, senha, perfil ou tokens: isso é só no site.
-9. Responda de forma curta: o que foi lançado, o que ficou duplicado/pendente e eventuais erros.`;
+8. Investimentos (caixinha, CDB, LCI/LCA, Tesouro, poupança, fundos, previdência, ações, FIIs, ETFs, BDRs, cripto)
+   NÃO são carteiras nem despesas: use as ferramentas *_investimento. Movimento com walletId tira/põe dinheiro na conta
+   (aporte/compra = aplicação, resgate/venda = resgate, proventos = receita); sem walletId só registra (ex.: saldo que
+   já existia). Caixinha/CDB/Tesouro: APORTE/RESGATE por valor e o sistema rende pelo CDI/IPCA; se o app do banco mostrar
+   outro saldo, registre ATUALIZACAO com amount = saldo do app. Ações/FIIs/cripto: COMPRA/VENDA com quantity e unitPrice
+   (+ fees); cotação nova = ATUALIZACAO com unitPrice. Ganho ou perda informado em reais ("rendeu 15", "caiu 120"):
+   ATUALIZACAO com variation (+/−), que é somada ao valor atual. Antes de registrar, veja os movimentos com ver_investimento (a
+   ferramenta também recusa movimento repetido; allowDuplicate só com confirmação do usuário).
+9. Não há ferramenta de login, cadastro de usuário, senha, perfil ou tokens: isso é só no site.
+10. Responda de forma curta: o que foi lançado, o que ficou duplicado/pendente e eventuais erros.`;
 
 const kind = z.enum(['DESPESA', 'RECEITA', 'TRANSFERENCIA', 'AJUSTE', 'PAGAMENTO_FATURA', 'ESTORNO']);
+/** Filtro de lançamentos: inclui os gerados por investimentos (aplicação e resgate). */
+const filterKind = z.enum(['DESPESA', 'RECEITA', 'TRANSFERENCIA', 'AJUSTE', 'PAGAMENTO_FATURA', 'ESTORNO', 'APLICACAO',
+  'RESGATE']);
 const status = z.enum(['CONFIRMADO', 'PENDENTE', 'CANCELADO']);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'data AAAA-MM-DD');
 const month = z.string().regex(/^\d{4}-\d{2}$/, 'mês AAAA-MM');
@@ -111,7 +122,7 @@ export function buildServer(api: ExternalApi, sealer: Sealer, publicUrl: string,
     description: 'Lista lançamentos por período e filtros (padrão: mês atual). Use para conferir antes de lançar ou para responder perguntas.',
     inputSchema: {
       from: date.optional(), to: date.optional(), accountId: uuid.optional(), walletId: uuid.optional(),
-      cardId: uuid.optional(), creditLineId: uuid.optional(), categoryId: uuid.optional(), kind: kind.optional(),
+      cardId: uuid.optional(), creditLineId: uuid.optional(), categoryId: uuid.optional(), kind: filterKind.optional(),
       status: status.optional(), q: z.string().max(100).optional().describe('Texto na descrição/observação'),
     },
     annotations: read,
@@ -280,7 +291,9 @@ export function buildServer(api: ExternalApi, sealer: Sealer, publicUrl: string,
     return batch;
   }));
 
-  registerAuxTools(server, { call, get, post, put: (p, b) => api.request<Json>(pat, 'PUT', p, b) }, read, write);
+  const http: Http = { call, get, post, put: (p, b) => api.request<Json>(pat, 'PUT', p, b) };
+  registerAuxTools(server, http, read, write);
+  registerInvestmentTools(server, http, read, write);
 
   server.registerTool('link_para_anexos', {
     title: 'Link para enviar arquivos',
@@ -577,6 +590,165 @@ function registerAuxTools(server: McpServer, h: Http, read: Hints, write: Hints)
       { recurrenceId: recurrenceId ?? null, recurrenceDate: recurrenceDate ?? null }))));
 }
 
+// ------------------------------------------------------------------------------------------------ investimentos
+
+const investmentType = z.enum(['CAIXINHA', 'CDB', 'LCI', 'LCA', 'TESOURO', 'POUPANCA', 'DEBENTURE', 'CRI_CRA', 'FUNDO',
+  'PREVIDENCIA', 'ACAO', 'FII', 'ETF', 'BDR', 'CRIPTO', 'OUTRO']);
+const indexer = z.enum(['CDI', 'SELIC', 'PRE', 'IPCA', 'POUPANCA', 'MANUAL']);
+const movementKind = z.enum(['APORTE', 'RESGATE', 'COMPRA', 'VENDA', 'PROVENTO', 'ATUALIZACAO']);
+
+/** Sem campos nulos (menos tokens). */
+const clean = (o: Json): Json => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));
+
+/** Investimento sem campos vazios. */
+function compactInvestment(i: Json): Json {
+  const keys = ['id', 'name', 'type', 'ticker', 'accountName', 'walletId', 'walletName', 'indexer', 'rate', 'maturityDate',
+    'archived', 'invested', 'currentValue', 'gain', 'gainPct', 'quantity', 'averagePrice', 'lastPrice', 'lastPriceDate',
+    'realizedGain', 'income', 'lastUpdate', 'ratesUntil', 'movementCount', 'notes'];
+  const out: Json = {};
+  for (const k of keys) {
+    const v = i[k];
+    if (v === null || v === undefined || (k === 'archived' && v === false)) continue;
+    if ((k === 'income' || k === 'realizedGain') && Number(v) === 0) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Investimentos: consultar, criar, editar e registrar/editar movimentos (sem exclusão: arquive com archived=true).
+ */
+function registerInvestmentTools(server: McpServer, h: Http, read: Hints, write: Hints) {
+  const { call, get, post, put } = h;
+
+  server.registerTool('listar_investimentos', {
+    title: 'Investimentos',
+    description: 'Carteira de investimentos: valor atual, investido, rendimento, proventos, renda fixa × variável e '
+      + 'cada investimento (caixinhas, CDB, Tesouro, ações, FIIs, cripto) com o ID.',
+    annotations: read,
+  }, async () => call(async () => {
+    const p = await get<Json & { investments: Json[] }>('/investments');
+    const { investments, ...summary } = p;
+    return { ...summary, investments: (investments ?? []).map(compactInvestment) };
+  }));
+
+  server.registerTool('ver_investimento', {
+    title: 'Detalhe de um investimento',
+    description: 'Um investimento com todos os movimentos (mais recentes primeiro). Use antes de registrar movimento '
+      + 'para não duplicar.',
+    inputSchema: { id: uuid },
+    annotations: read,
+  }, async ({ id }) => call(async () => {
+    const d = await get<{ investment: Json; movements: Json[] }>(`/investments/${id}`);
+    return { investment: compactInvestment(d.investment), movements: d.movements.map(clean) };
+  }));
+
+  const investmentFields = {
+    name: z.string().min(1).max(80).describe('Ex.: Caixinha Nubank, CDB Inter 110%, Tesouro Selic 2029, PETR4'),
+    type: investmentType.describe('ACAO/FII/ETF/BDR/CRIPTO = por quantidade e preço; o resto = por valor'),
+    ticker: z.string().max(20).optional().describe('Código (ações, FIIs, cripto)'),
+    indexer: indexer.optional().describe('Por valor: como rende (padrão: CDI para caixinha/CDB, MANUAL se não souber)'),
+    rate: z.number().optional().describe('CDI/SELIC: % do índice (100 = 100% do CDI); PRE: % ao ano; IPCA: spread % ao ano'),
+    maturityDate: date.optional(),
+    accountId: uuid.optional().describe('Instituição (conta do banco/corretora)'),
+    walletId: uuid.optional().describe('Carteira padrão de aportes/resgates'),
+    notes: z.string().max(1000).optional(),
+  };
+
+  server.registerTool('criar_investimento', {
+    title: 'Criar investimento',
+    description: 'Cadastra um investimento. Confira antes com listar_investimentos se ele já não existe. Para o saldo '
+      + 'que já existe, registre depois um APORTE (ou COMPRA) sem walletId.',
+    inputSchema: investmentFields,
+    annotations: write,
+  }, async (args) => call(async () => {
+    const byQty = ['ACAO', 'FII', 'ETF', 'BDR', 'CRIPTO'].includes(args.type);
+    const body = { ...args, indexer: byQty ? null : (args.indexer ?? 'MANUAL') };
+    return compactInvestment(await post<Json>('/investments', body));
+  }));
+
+  const partialInvestment = Object.fromEntries(Object.entries(investmentFields).map(([k, v]) => [k, v.optional()]));
+  server.registerTool('editar_investimento', {
+    title: 'Editar investimento',
+    description: 'Altera nome, taxa, vencimento, instituição, carteira padrão ou arquiva (archived=true). Só os campos '
+      + 'informados mudam.',
+    inputSchema: { id: uuid, ...partialInvestment, archived: z.boolean().optional() },
+    annotations: write,
+  }, async ({ id, ...changes }) => call(async () => {
+    const i = (await get<{ investment: Json }>(`/investments/${id}`)).investment;
+    const base = Object.fromEntries(['name', 'type', 'ticker', 'accountId', 'walletId', 'indexer', 'rate', 'maturityDate',
+      'color', 'notes', 'archived'].map(k => [k, i[k]]));
+    return compactInvestment(await put(`/investments/${id}`, { ...base, ...given(changes as Json) }));
+  }));
+
+  const movementFields = {
+    kind: movementKind.describe('APORTE/RESGATE (por valor), COMPRA/VENDA (por quantidade), PROVENTO, ATUALIZACAO'),
+    date: date.describe('Data do movimento (não pode ser futura)'),
+    amount: z.number().optional().describe('APORTE/RESGATE/PROVENTO: valor; ATUALIZACAO por valor: saldo atual'),
+    quantity: z.number().positive().optional().describe('COMPRA/VENDA'),
+    unitPrice: z.number().positive().optional().describe('COMPRA/VENDA: preço; ATUALIZACAO de ação/FII/cripto: cotação'),
+    fees: z.number().min(0).optional().describe('COMPRA/VENDA: taxas/corretagem'),
+    walletId: uuid.optional().describe('Conta de onde sai (aporte/compra) ou para onde vai (resgate/venda/proventos). '
+      + 'Sem ela, só registra no investimento'),
+    notes: z.string().max(1000).optional(),
+    allowDuplicate: z.boolean().optional().describe('Só com confirmação do usuário'),
+  };
+
+  server.registerTool('registrar_movimento_investimento', {
+    title: 'Registrar movimento de investimento',
+    description: 'Aporte, resgate, compra, venda, proventos ou atualização de valor (ganho ou perda). Para registrar '
+      + 'ganho/perda: kind=ATUALIZACAO com o novo saldo (amount) ou nova cotação (unitPrice), OU só a variation '
+      + '(+ ganhou, − perdeu) que a ferramenta soma ao valor atual. Recusa movimento igual (mesmo tipo e valor até '
+      + '3 dias) sem allowDuplicate. Devolve o investimento atualizado.',
+    inputSchema: {
+      investmentId: uuid, ...movementFields,
+      variation: z.number().optional().describe('Só com ATUALIZACAO: ganho (positivo) ou perda (negativo) em reais '
+        + 'sobre o valor atual. Ex.: caixinha rendeu 15,30 → 15.3; ações caíram 120 → -120'),
+    },
+    annotations: write,
+  }, async ({ investmentId, variation, ...body }) => call(async () => {
+    let before: number | undefined;
+    if (variation !== undefined) {
+      if (body.kind !== 'ATUALIZACAO') throw new ApiError(400, 'variation só vale com kind=ATUALIZACAO.');
+      const inv = (await get<{ investment: Json }>(`/investments/${investmentId}`)).investment;
+      before = Number(inv.currentValue);
+      const after = Math.round((before + variation) * 100) / 100;
+      if (after < 0) throw new ApiError(400, `A perda (${variation}) é maior que o valor atual (${before}).`);
+      if (inv.byQuantity) {
+        const qty = Number(inv.quantity);
+        if (!(qty > 0)) throw new ApiError(400, 'Sem quantidade em carteira para recalcular a cotação.');
+        if (!(after > 0)) throw new ApiError(400, 'O novo valor precisa ser positivo para calcular a cotação.');
+        body.unitPrice = Math.round((after / qty) * 1e8) / 1e8;
+        delete body.amount;
+      } else {
+        body.amount = after;
+        delete body.unitPrice;
+      }
+    }
+    const d = await post<{ investment: Json; movements: Json[] }>(`/investments/${investmentId}/movements`, body);
+    const out: Json = { investment: compactInvestment(d.investment), ultimo_movimento: clean(d.movements[0] ?? {}) };
+    if (before !== undefined) out.variacao = { antes: before, depois: d.investment.currentValue, variacao: variation };
+    return out;
+  }));
+
+  const partialMovement = Object.fromEntries(Object.entries(movementFields).map(([k, v]) => [k, v.optional()]));
+  server.registerTool('editar_movimento_investimento', {
+    title: 'Editar movimento de investimento',
+    description: 'Corrige um movimento (valor, data, quantidade, preço, conta). Só os campos informados mudam; o '
+      + 'lançamento ligado na conta é refeito.',
+    inputSchema: { investmentId: uuid, movementId: uuid, ...partialMovement, walletId: uuid.nullable().optional() },
+    annotations: write,
+  }, async ({ investmentId, movementId, ...changes }) => call(async () => {
+    const d = await get<{ movements: Json[] }>(`/investments/${investmentId}`);
+    const m = find(d.movements, movementId, 'Movimento');
+    const trade = m.kind === 'COMPRA' || m.kind === 'VENDA';
+    const base: Json = { kind: m.kind, date: m.date, amount: trade ? null : m.amount, quantity: m.quantity,
+      unitPrice: m.unitPrice, fees: m.fees, walletId: m.walletId, notes: m.notes };
+    const r = await put(`/investments/${investmentId}/movements/${movementId}`, { ...base, ...given(changes as Json) });
+    return { investment: compactInvestment((r as { investment: Json }).investment) };
+  }));
+}
+
 // ---------------------------------------------------------------------------------------------- formatos enxutos
 
 /** Lançamento sem campos vazios (menos tokens). */
@@ -585,7 +757,7 @@ export function compactTx(t: Json): Json {
   const keys = ['id', 'date', 'kind', 'status', 'description', 'amount', 'accountName', 'walletName', 'walletId',
     'cardName', 'cardId', 'creditLineName', 'invoiceId', 'invoiceReference', 'categoryName', 'categoryId', 'notes',
     'installmentNumber', 'installmentCount', 'consumesLimit', 'originalCurrency', 'originalAmount', 'exchangeRate', 'iof',
-    'recurrenceId', 'recurrenceDate', 'origin', 'importBatchId', 'reversalOf', 'targetWalletName'];
+    'recurrenceId', 'recurrenceDate', 'origin', 'importBatchId', 'reversalOf', 'targetWalletName', 'investmentId'];
   for (const k of keys) {
     const v = t[k];
     if (v === null || v === undefined) continue;

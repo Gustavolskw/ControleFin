@@ -179,7 +179,7 @@ import_batches (user_id, origem, token_id, status, criado_em, resumo)
 
 ## 7. Fases sugeridas
 
-Situação: fases 0 a 5 **concluídas**. Conector do Claude: [`MCP.md`](MCP.md). Contrato da API externa: [`API_EXTERNA.md`](API_EXTERNA.md).
+Situação: fases 0 a 5 **concluídas**, mais **investimentos** (abaixo). Conector do Claude: [`MCP.md`](MCP.md). Contrato da API externa: [`API_EXTERNA.md`](API_EXTERNA.md).
 
 0. **Infra + Auth:** monorepo, compose (postgres, backend, frontend, nginx, traefik), `controlefin.sh`,
    login/convite/perguntas/primeiro acesso/bloqueio (portado da referência) + isolamento por usuário.
@@ -242,9 +242,32 @@ Situação: fases 0 a 5 **concluídas**. Conector do Claude: [`MCP.md`](MCP.md).
    - O MCP não transporta os arquivos do usuário. Por isso cada importação devolve um link de envio de 24 h, que usa a rota nova `POST /ext/v1/imports/{id}/attachments`.
 
    **Ferramentas**
-   - 42 ferramentas, uma para cada rota da API externa (paridade testada), só de gestão financeira (sem login, cadastro ou configuração de usuário), cobrindo consulta, duplicidade, importação nos 3 modos, edição, estorno, recorrências, faturas, revisão de lotes e os cadastros auxiliares (contas, carteiras, categorias, limites, cartões e recorrências: consultar, criar e editar; sem exclusão, arquivar no lugar).
+   - 48 ferramentas, uma para cada rota da API externa (paridade testada), só de gestão financeira (sem login, cadastro ou configuração de usuário), cobrindo consulta, duplicidade, importação nos 3 modos, edição, estorno, recorrências, faturas, revisão de lotes e os cadastros auxiliares (contas, carteiras, categorias, limites, cartões e recorrências: consultar, criar e editar; sem exclusão, arquivar no lugar).
    - O servidor entrega as instruções de uso ao conectar.
 6. Relatórios, orçamento, exportação LGPD, 2FA.
+
+**Investimentos (entregue antes da fase 6, a pedido)**
+
+- **Fora das contas.** Os investimentos não são carteiras dentro de uma conta. O painel mostra três números:
+  "Disponível em contas", "Investido" e "Patrimônio total" (a soma). A previsão do mês usa só o disponível.
+- **Por valor:** caixinha, CDB, LCI/LCA, Tesouro, poupança, debênture, CRI/CRA, fundo e previdência.
+  - Rendem sozinhos pelo indexador, com dados públicos do Banco Central (SGS: CDI 12, Selic 11, IPCA 433).
+  - As taxas são sincronizadas ao subir o sistema e três vezes por dia, e ficam em `index_rates`. Nada do usuário é enviado.
+  - **Como cada indexador rende:**
+    - CDI e Selic: % do índice por dia útil;
+    - prefixado: base 252 dias úteis;
+    - IPCA: o do mês, pró-rata (sem o mês publicado, usa o último), mais a taxa adicional;
+    - poupança: a regra oficial, sem TR;
+    - manual: só muda quando o usuário informa.
+  - **Atualização de saldo:** troca o valor pelo saldo real do banco, e o rendimento continua a partir dali.
+  - **Valores brutos:** o cálculo não desconta IR.
+- **Por quantidade:** ações, FIIs, ETFs, BDRs e cripto. Usam preço médio ponderado (com taxas), lucro realizado nas
+  vendas, proventos e última cotação. Cotação automática ficou de fora: ela exigiria um serviço externo que saberia
+  quais ativos você tem.
+- **Movimentos com conta** geram lançamentos ligados ao investimento, que só mudam pelo movimento:
+  - `APLICACAO` (sai da conta), `RESGATE` (volta para a conta) ou `RECEITA` (proventos);
+  - aplicação e resgate não contam como despesa nem receita.
+- **Pelo Claude:** são 6 ferramentas, com variação de ganho ou perda em reais. Não há exclusão pela API.
 
 ---
 

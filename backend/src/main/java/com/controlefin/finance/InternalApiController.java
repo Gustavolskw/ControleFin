@@ -47,6 +47,12 @@ import com.controlefin.finance.FinanceEnums.TransactionKind;
 import com.controlefin.finance.FinanceEnums.TransactionStatus;
 import com.controlefin.finance.ImportDtos.BatchResponse;
 import com.controlefin.finance.ImportDtos.ImportRequest;
+import com.controlefin.finance.InvestmentDtos.InvestmentDetail;
+import com.controlefin.finance.InvestmentDtos.InvestmentRequest;
+import com.controlefin.finance.InvestmentDtos.InvestmentResponse;
+import com.controlefin.finance.InvestmentDtos.MovementRequest;
+import com.controlefin.finance.InvestmentDtos.Portfolio;
+import com.controlefin.finance.FinanceEnums.Origin;
 
 import jakarta.validation.Valid;
 
@@ -54,8 +60,8 @@ import jakarta.validation.Valid;
  * Rotas que a api-externa repassa (Claude/MCP). Só chegam aqui com o segredo de serviço e um token pessoal válido
  * (o usuário vem do token, nunca da requisição). GET exige token de leitura; o resto, token com escrita.
  * Não há nada de login, cadastro ou administração de usuários aqui: só a gestão financeira (lançamentos, importações e os
- * registros auxiliares: contas, carteiras, categorias, limites, cartões e recorrências). Não há exclusão: para tirar de
- * uso, edite com archived=true (recorrência: active=false).
+ * registros auxiliares: contas, carteiras, categorias, limites, cartões, recorrências e investimentos). Não há exclusão:
+ * para tirar de uso, edite com archived=true (recorrência: active=false).
  */
 @RestController
 @RequestMapping("/api/internal/v1")
@@ -70,11 +76,13 @@ public class InternalApiController {
     private final DashboardService dashboard;
     private final ImportService imports;
     private final AuditService audit;
+    private final InvestmentService investments;
 
     public InternalApiController(AccountService accounts, CardService cards, CategoryService categories,
                                  RecurrenceService recurrences, TransactionService transactions,
                                  InvoiceService invoices, DashboardService dashboard, ImportService imports,
-                                 AuditService audit) {
+                                 AuditService audit, InvestmentService investments) {
+        this.investments = investments;
         this.accounts = accounts;
         this.cards = cards;
         this.categories = categories;
@@ -397,5 +405,53 @@ public class InternalApiController {
         TransactionResponse r = recurrences.link(u, id, req);
         audit.log(u, "LANCAMENTO_VINCULADO", id, r.description());
         return r;
+    }
+
+    // ---------------------------------------------------------------- investimentos
+
+    @GetMapping("/investments")
+    public Portfolio investmentPortfolio() {
+        return investments.portfolio(CurrentUser.id());
+    }
+
+    @GetMapping("/investments/{id}")
+    public InvestmentDetail investment(@PathVariable UUID id) {
+        return investments.detail(CurrentUser.id(), id);
+    }
+
+    @PostMapping("/investments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public InvestmentResponse createInvestment(@Valid @RequestBody InvestmentRequest req) {
+        UUID u = CurrentUser.id();
+        InvestmentResponse r = investments.create(u, req);
+        audit.log(u, "INVESTIMENTO_CRIADO", r.id(), r.name());
+        return r;
+    }
+
+    @PutMapping("/investments/{id}")
+    public InvestmentResponse updateInvestment(@PathVariable UUID id, @Valid @RequestBody InvestmentRequest req) {
+        UUID u = CurrentUser.id();
+        InvestmentResponse r = investments.update(u, id, req);
+        audit.log(u, "INVESTIMENTO_EDITADO", id, r.name());
+        return r;
+    }
+
+    @PostMapping("/investments/{id}/movements")
+    @ResponseStatus(HttpStatus.CREATED)
+    public InvestmentDetail addInvestmentMovement(@PathVariable UUID id, @Valid @RequestBody MovementRequest req) {
+        UUID u = CurrentUser.id();
+        InvestmentDetail d = investments.addMovement(u, id, req, Origin.API);
+        audit.log(u, "MOVIMENTO_INVESTIMENTO", id, d.investment().name() + " · " + req.kind()
+                + (req.amount() != null ? " · " + req.amount() : ""));
+        return d;
+    }
+
+    @PutMapping("/investments/{id}/movements/{movementId}")
+    public InvestmentDetail updateInvestmentMovement(@PathVariable UUID id, @PathVariable UUID movementId,
+                                                     @Valid @RequestBody MovementRequest req) {
+        UUID u = CurrentUser.id();
+        InvestmentDetail d = investments.updateMovement(u, id, movementId, req);
+        audit.log(u, "MOVIMENTO_INVESTIMENTO_EDITADO", movementId, d.investment().name() + " · " + req.kind());
+        return d;
     }
 }

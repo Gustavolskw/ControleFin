@@ -23,6 +23,7 @@ import com.controlefin.finance.FinanceDtos.TransactionRequest;
 import com.controlefin.finance.FinanceEnums.CategoryKind;
 import com.controlefin.finance.FinanceEnums.Origin;
 import com.controlefin.finance.FinanceEnums.TransactionKind;
+import com.controlefin.finance.FinanceEnums.TransactionStatus;
 
 /** Regras dos lançamentos e isolamento: nada de outro usuário é aceito. */
 class TransactionRulesTest {
@@ -126,6 +127,31 @@ class TransactionRulesTest {
         wallet.setArchived(true);
         assertThrows(ApiException.class,
                 () -> service.create(me, req(TransactionKind.RECEITA, "10", wallet.getId(), null, null), Origin.WEB));
+    }
+
+    @Test
+    void aplicacaoEResgateNaoSaoLancamentoAvulso() {
+        assertThrows(ApiException.class,
+                () -> service.create(me, req(TransactionKind.APLICACAO, "100", wallet.getId(), null, null), Origin.WEB));
+        assertThrows(ApiException.class,
+                () -> service.create(me, req(TransactionKind.RESGATE, "100", wallet.getId(), null, null), Origin.API));
+    }
+
+    @Test
+    void lancamentoDeInvestimentoSoMudaPeloInvestimento() throws Exception {
+        Transaction t = withId(new Transaction(me, Origin.WEB));
+        t.setKind(TransactionKind.APLICACAO);
+        t.setDate(LocalDate.of(2026, 11, 10));
+        t.setDescription("Aplicação: Caixinha");
+        t.setAmount(new BigDecimal("100.00"));
+        t.setWalletId(wallet.getId());
+        t.setInvestmentId(UUID.randomUUID());
+        when(transactions.findByIdAndUserId(t.getId(), me)).thenReturn(Optional.of(t));
+        var edit = req(TransactionKind.DESPESA, "50", wallet.getId(), null, null);
+        assertThrows(ApiException.class, () -> service.update(me, t.getId(), edit));
+        assertThrows(ApiException.class, () -> service.delete(me, t.getId()));
+        assertThrows(ApiException.class, () -> service.reverse(me, t.getId(), null));
+        assertThrows(ApiException.class, () -> service.setStatus(me, t.getId(), TransactionStatus.CANCELADO));
     }
 
     private static <T> T withId(T entity) throws Exception {

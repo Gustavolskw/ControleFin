@@ -336,7 +336,7 @@ interface CategoryGroup { parent: Category; children: Category[]; }
     button.link { background: none; border: 0; padding: 2px 0; color: var(--accent); cursor: pointer; font-size: 12px; }
     .warning { margin-bottom: 12px; }
     @media (max-width: 700px) {
-      .wide { display: none; }
+      th.wide, td.wide { display: none; }
       .meta { display: block; }
       td.actions { white-space: normal; }
       td.actions .btn { margin: 2px 0; }

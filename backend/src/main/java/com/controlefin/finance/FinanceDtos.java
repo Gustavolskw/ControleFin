@@ -143,7 +143,7 @@ public final class FinanceDtos {
                                       UUID installmentGroup, Integer installmentNumber, Integer installmentCount,
                                       String originalCurrency, BigDecimal originalAmount, BigDecimal exchangeRate,
                                       BigDecimal iof, UUID reversalOf, UUID recurrenceId,
-                                      LocalDate recurrenceDate, UUID importBatchId) {
+                                      LocalDate recurrenceDate, UUID importBatchId, UUID investmentId) {
     }
 
     public record TransactionFilter(LocalDate from, LocalDate to, UUID accountId, UUID walletId, UUID categoryId,
@@ -236,12 +236,14 @@ public final class FinanceDtos {
     /**
      * invoicesToPay = faturas fechadas não pagas + fatura aberta de cada limite (sem parcelas futuras);
      * projectedEndOfMonth já considera as recorrências do mês (em conta) ainda não lançadas;
-     * upcoming = próximas ocorrências (e atrasadas) de recorrências.
+     * upcoming = próximas ocorrências (e atrasadas) de recorrências;
+     * invested = valor atual dos investimentos (fora do total das contas); patrimony = total + invested.
      */
     public record DashboardResponse(LocalDate asOf, BigDecimal total, BigDecimal totalPf, BigDecimal totalPj,
                                     BigDecimal projectedEndOfMonth, List<AccountResponse> accounts,
                                     MonthSummary month, long pendingCount, BigDecimal invoicesToPay,
-                                    List<CreditLineResponse> creditLines, List<OccurrenceResponse> upcoming) {
+                                    List<CreditLineResponse> creditLines, List<OccurrenceResponse> upcoming,
+                                    BigDecimal invested, BigDecimal patrimony) {
     }
 
     // ---------------------------------------------------------------- recorrências

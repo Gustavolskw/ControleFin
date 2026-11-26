@@ -192,6 +192,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse update(UUID userId, UUID id, TransactionRequest req) {
         Transaction t = transaction(userId, id);
+        notFromInvestment(t);
         if (t.getInstallmentGroup() != null) {
             if (req.kind() != t.getKind()) {
                 throw ApiException.badRequest("Não dá para mudar o tipo de uma compra parcelada.");
@@ -222,6 +223,7 @@ public class TransactionService {
     @Transactional
     public void delete(UUID userId, UUID id) {
         Transaction t = transaction(userId, id);
+        notFromInvestment(t);
         transactions.deleteAll(t.getInstallmentGroup() == null ? List.of(t) : group(userId, t));
     }
 
@@ -236,6 +238,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse reverse(UUID userId, UUID id, ReverseRequest req) {
         Transaction t = transaction(userId, id);
+        notFromInvestment(t);
         if (t.getKind() != TransactionKind.DESPESA) {
             throw ApiException.badRequest("Só compras (despesas) podem ser estornadas.");
         }
@@ -320,6 +323,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse setStatus(UUID userId, UUID id, TransactionStatus status) {
         Transaction t = transaction(userId, id);
+        notFromInvestment(t);
         for (Transaction r : rows(userId, t)) {
             r.setStatus(status);
             r.touch();
@@ -336,6 +340,40 @@ public class TransactionService {
             throw ApiException.badRequest("Lançamento cancelado não pode ser confirmado.");
         }
         return setStatus(userId, id, TransactionStatus.CONFIRMADO);
+    }
+
+    /** Lançamento gerado por um investimento (aplicação, resgate, proventos) só muda pelo investimento. */
+    private static void notFromInvestment(Transaction t) {
+        if (t.getInvestmentId() != null) {
+            throw ApiException.badRequest("Este lançamento foi gerado por um investimento: altere ou exclua o movimento "
+                    + "na tela de Investimentos.");
+        }
+    }
+
+    /**
+     * Lançamento ligado a um movimento de investimento: APLICACAO (sai da carteira), RESGATE (volta) ou RECEITA
+     * (proventos). Sempre confirmado e numa carteira ativa.
+     */
+    Transaction saveInvestmentTransaction(UUID userId, Origin origin, TransactionKind kind, UUID walletId,
+                                          UUID investmentId, LocalDate date, String description, BigDecimal amount) {
+        activeWallet(userId, walletId, true);
+        Transaction t = new Transaction(userId, origin);
+        t.setKind(kind);
+        t.setStatus(TransactionStatus.CONFIRMADO);
+        t.setDate(date);
+        t.setDescription(description.length() > 200 ? description.substring(0, 200) : description);
+        t.setAmount(Money.of(amount));
+        t.setWalletId(walletId);
+        t.setInvestmentId(investmentId);
+        return transactions.saveAndFlush(t);
+    }
+
+    /** Apaga o lançamento de um movimento de investimento que foi alterado ou excluído. */
+    void deleteInvestmentTransaction(UUID userId, UUID transactionId) {
+        transactions.findByIdAndUserId(transactionId, userId).ifPresent(t -> {
+            transactions.delete(t);
+            transactions.flush();
+        });
     }
 
     Transaction transaction(UUID userId, UUID id) {
@@ -361,6 +399,10 @@ public class TransactionService {
     private Plan plan(UUID userId, TransactionRequest req, Transaction current) {
         TransactionKind kind = req.kind();
         boolean isNew = current == null;
+        if (kind == TransactionKind.APLICACAO || kind == TransactionKind.RESGATE) {
+            throw ApiException.badRequest("Aplicações e resgates são registrados como movimento do investimento "
+                    + "(tela Investimentos), não como lançamento avulso.");
+        }
 
         Foreign foreign = foreign(req);
         BigDecimal amount = req.amount() != null ? Money.of(req.amount())
@@ -587,6 +629,6 @@ public class TransactionService {
                 t.getInvoiceId(), inv == null ? null : inv.getReference().toString(), t.isConsumesLimit(),
                 t.getInstallmentGroup(), t.getInstallmentNumber(), t.getInstallmentCount(),
                 t.getOriginalCurrency(), t.getOriginalAmount(), t.getExchangeRate(), t.getIof(), t.getReversalOf(),
-                t.getRecurrenceId(), t.getRecurrenceDate(), t.getImportBatchId());
+                t.getRecurrenceId(), t.getRecurrenceDate(), t.getImportBatchId(), t.getInvestmentId());
     }
 }

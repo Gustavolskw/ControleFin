@@ -26,10 +26,17 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
 
       <div class="kpis">
         <div class="kpi main">
-          <div class="label">Saldo total (todas as contas)</div>
+          <div class="label">Disponível em contas</div>
           <div class="value">{{ d.total | brl }}</div>
           <div class="detail">PF {{ d.totalPf | brl }} · PJ {{ d.totalPj | brl }}</div>
         </div>
+        @if (d.invested > 0) {
+          <a class="kpi link" routerLink="/investimentos">
+            <div class="label">Investido</div>
+            <div class="value">{{ d.invested | brl }}</div>
+            <div class="detail">Patrimônio total: <strong>{{ d.patrimony | brl }}</strong></div>
+          </a>
+        }
         <div class="kpi">
           <div class="label">Previsão no fim do mês</div>
           <div class="value">{{ d.projectedEndOfMonth | brl }}</div>
@@ -158,6 +165,8 @@ import { MonthPickerComponent } from '../shared/month-picker.component';
     .fill { height: 100%; background: var(--brand); border-radius: 4px; min-width: 2px; }
     .bars li:hover .fill { background: var(--brand-strong); }
     .side { display: grid; gap: 16px; }
+    a.kpi.link { color: inherit; text-decoration: none; }
+    a.kpi.link:hover { border-color: var(--accent); }
     .upcoming { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
     .upcoming li { display: grid; grid-template-columns: 78px 1fr auto; gap: 8px; align-items: baseline; font-size: 13px; }
     .upcoming .date { color: var(--muted); font-variant-numeric: tabular-nums; }

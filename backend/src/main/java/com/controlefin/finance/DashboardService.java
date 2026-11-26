@@ -33,11 +33,13 @@ public class DashboardService {
     private final CategoryRepository categories;
     private final CardService cardService;
     private final RecurrenceService recurrenceService;
+    private final InvestmentService investmentService;
 
     public DashboardService(AccountService accountService, TransactionRepository transactions,
                             CategoryRepository categories, CardService cardService,
-                            RecurrenceService recurrenceService) {
+                            RecurrenceService recurrenceService, InvestmentService investmentService) {
         this.recurrenceService = recurrenceService;
+        this.investmentService = investmentService;
         this.accountService = accountService;
         this.transactions = transactions;
         this.categories = categories;
@@ -64,9 +66,10 @@ public class DashboardService {
                 .add(recurrenceService.pendingWalletImpact(userId, YearMonth.from(today)));
 
         var lines = cardService.listCreditLines(userId).stream().filter(l -> !l.archived()).toList();
+        BigDecimal invested = investmentService.totalValue(userId);
         return new DashboardResponse(today, total, pf, pj, projected, accounts, summary(userId, ym),
                 transactions.countByUserIdAndStatus(userId, TransactionStatus.PENDENTE), CardService.toPay(lines),
-                lines, recurrenceService.upcoming(userId, 30, 8));
+                lines, recurrenceService.upcoming(userId, 30, 8), invested, total.add(invested));
     }
 
     MonthSummary summary(UUID userId, YearMonth ym) {

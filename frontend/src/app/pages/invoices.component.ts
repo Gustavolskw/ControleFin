@@ -150,7 +150,7 @@ interface WalletOption { id: string; label: string; }
     td .tag { margin-left: 4px; }
     .meta { display: none; font-size: 12px; margin-top: 2px; }
     @media (max-width: 700px) {
-      .wide { display: none; }
+      th.wide, td.wide { display: none; }
       .meta { display: block; }
     }
   `,

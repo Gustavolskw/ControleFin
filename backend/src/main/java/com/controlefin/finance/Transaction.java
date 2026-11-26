@@ -108,6 +108,10 @@ public class Transaction {
     @Column(name = "reversal_of")
     private UUID reversalOf;
 
+    /** Investimento que gerou este lançamento (aplicação, resgate ou proventos): só muda pelo investimento. */
+    @Column(name = "investment_id")
+    private UUID investmentId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10, updatable = false)
     private Origin origin = Origin.WEB;
@@ -180,6 +184,8 @@ public class Transaction {
     public void setImportBatchId(UUID importBatchId) { this.importBatchId = importBatchId; }
     public UUID getReversalOf() { return reversalOf; }
     public void setReversalOf(UUID reversalOf) { this.reversalOf = reversalOf; }
+    public UUID getInvestmentId() { return investmentId; }
+    public void setInvestmentId(UUID investmentId) { this.investmentId = investmentId; }
     public boolean isCredit() { return invoiceId != null && kind != FinanceEnums.TransactionKind.PAGAMENTO_FATURA; }
     public Origin getOrigin() { return origin; }
     public Instant getCreatedAt() { return createdAt; }

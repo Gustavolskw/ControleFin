@@ -72,6 +72,12 @@ describe('fluxo OAuth + MCP', () => {
           res.end(JSON.stringify({ id: '3f1c2a7e-9b8d-4c6a-a1b2-0c9d8e7f6a5b', created: 1, items: [] }));
         } else if (req.url!.startsWith('/ext/v1/transactions/similar')) {
           res.end('[]');
+        } else if (req.url!.startsWith('/ext/v1/investments/')) {
+          const id = '3f1c2a7e-9b8d-4c6a-a1b2-0c9d8e7f6a5b';
+          res.end(JSON.stringify({ investment: { id, name: 'Caixinha', type: 'CAIXINHA', indexer: 'CDI', rate: 100 },
+            movements: [{ id, kind: 'APORTE', date: '2026-11-25', amount: 100, walletId: null }] }));
+        } else if (req.url!.startsWith('/ext/v1/investments')) {
+          res.end(JSON.stringify(req.method === 'GET' ? { currentValue: 0, investments: [] } : { id: 'x', name: 'x' }));
         } else {
           const id = '3f1c2a7e-9b8d-4c6a-a1b2-0c9d8e7f6a5b';
           res.end(JSON.stringify([{ id, name: 'x', walletId: id, cardId: null, wallets: [{ id, name: 'w',
@@ -201,7 +207,7 @@ describe('fluxo OAuth + MCP', () => {
     for (const n of ['obter_contexto', 'verificar_duplicados', 'importar_lancamentos', 'estornar_lancamento']) {
       assert.ok(names.includes(n), n);
     }
-    assert.equal(names.length, 42);
+    assert.equal(names.length, 48);
     // Regra: nada de login, cadastro, senha, perfil, token ou configuração de usuário.
     for (const n of names) assert.doesNotMatch(n, /login|senha|usuario|perfil|cadastr|token|conta_de_acesso|config/);
   });
@@ -263,6 +269,14 @@ describe('fluxo OAuth + MCP', () => {
       ['candidatos_da_ocorrencia', { recurrenceId: id, date: '2026-12-01' }, 'GET', /\/candidates$/],
       ['vincular_a_recorrencia', { transactionId: id, recurrenceId: id, recurrenceDate: '2026-12-01' }, 'PUT',
         /\/transactions\/.+\/recurrence$/],
+      ['listar_investimentos', {}, 'GET', /\/investments$/],
+      ['ver_investimento', { id }, 'GET', new RegExp(`/investments/${id}$`)],
+      ['criar_investimento', { name: 'Caixinha', type: 'CAIXINHA', indexer: 'CDI', rate: 100 }, 'POST', /\/investments$/],
+      ['editar_investimento', { id, rate: 105 }, 'PUT', new RegExp(`/investments/${id}$`)],
+      ['registrar_movimento_investimento', { investmentId: id, kind: 'APORTE', date: '2026-11-25', amount: 100 }, 'POST',
+        /\/investments\/.+\/movements$/],
+      ['editar_movimento_investimento', { investmentId: id, movementId: id, amount: 150 }, 'PUT',
+        /\/investments\/.+\/movements\/.+$/],
     ];
     for (const [name, args, method, url] of cases) {
       calls.length = 0;

@@ -74,6 +74,7 @@ export class AppComponent {
       { path: '/contas', label: 'Contas' },
       { path: '/cartoes', label: 'Cartões' },
       { path: '/recorrencias', label: 'Recorrências' },
+      { path: '/investimentos', label: 'Investimentos' },
       { path: '/importacoes', label: 'Importações' },
       { path: '/categorias', label: 'Categorias' },
     ];

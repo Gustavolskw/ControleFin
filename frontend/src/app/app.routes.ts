@@ -6,6 +6,7 @@ import { CardsComponent } from './pages/cards.component';
 import { CategoriesComponent } from './pages/categories.component';
 import { DashboardComponent } from './pages/dashboard.component';
 import { ImportsComponent } from './pages/imports.component';
+import { InvestmentsComponent } from './pages/investments.component';
 import { InvoicesComponent } from './pages/invoices.component';
 import { LoginComponent } from './pages/login.component';
 import { ProfileComponent } from './pages/profile.component';
@@ -23,6 +24,7 @@ export const routes: Routes = [
   { path: 'contas', component: AccountsComponent, canActivate: [authGuard] },
   { path: 'cartoes', component: CardsComponent, canActivate: [authGuard] },
   { path: 'recorrencias', component: RecurrencesComponent, canActivate: [authGuard] },
+  { path: 'investimentos', component: InvestmentsComponent, canActivate: [authGuard] },
   { path: 'importacoes', component: ImportsComponent, canActivate: [authGuard] },
   { path: 'cartoes/:id/faturas', component: InvoicesComponent, canActivate: [authGuard] },
   { path: 'categorias', component: CategoriesComponent, canActivate: [authGuard] },

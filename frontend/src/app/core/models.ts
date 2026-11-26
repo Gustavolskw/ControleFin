@@ -104,12 +104,13 @@ export interface CategoryRequest {
 
 // ------------------------------------------------------------------ lançamentos
 
-export type TransactionKind = 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA' | 'AJUSTE' | 'PAGAMENTO_FATURA' | 'ESTORNO';
+export type TransactionKind = 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA' | 'AJUSTE' | 'PAGAMENTO_FATURA' | 'ESTORNO'
+  | 'APLICACAO' | 'RESGATE';
 export type TransactionStatus = 'CONFIRMADO' | 'PENDENTE' | 'CANCELADO';
 
 export const KIND_LABEL: Record<TransactionKind, string> = {
   RECEITA: 'Receita', DESPESA: 'Despesa', TRANSFERENCIA: 'Transferência', AJUSTE: 'Ajuste',
-  PAGAMENTO_FATURA: 'Pagamento de fatura', ESTORNO: 'Estorno',
+  PAGAMENTO_FATURA: 'Pagamento de fatura', ESTORNO: 'Estorno', APLICACAO: 'Aplicação', RESGATE: 'Resgate',
 };
 export const STATUS_LABEL: Record<TransactionStatus, string> = {
   CONFIRMADO: 'Confirmado', PENDENTE: 'Pendente', CANCELADO: 'Cancelado',
@@ -153,6 +154,8 @@ export interface Transaction {
   recurrenceId: string | null;
   recurrenceDate: string | null;
   importBatchId: string | null;
+  /** Gerado por um investimento (aplicação, resgate, proventos): muda só pelo investimento. */
+  investmentId: string | null;
 }
 
 export interface TransactionRequest {
@@ -308,6 +311,10 @@ export interface Dashboard {
   invoicesToPay: number;
   creditLines: CreditLine[];
   upcoming: Occurrence[];
+  /** Valor atual dos investimentos (fora do saldo das contas). */
+  invested: number;
+  /** Contas + investimentos. */
+  patrimony: number;
 }
 
 // ------------------------------------------------------------------ recorrências
@@ -452,7 +459,15 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   IMPORTACAO_CONFIRMADA: 'Importação confirmada', IMPORTACAO_DESFEITA: 'Importação desfeita',
   LANCAMENTO_EDITADO: 'Lançamento editado', LANCAMENTO_CONFIRMADO: 'Lançamento confirmado',
   LANCAMENTO_ESTORNADO: 'Lançamento estornado', ANEXOS_ENVIADOS: 'Arquivos enviados',
-  MCP_CONECTADO: 'Claude conectado',
+  MCP_CONECTADO: 'Claude conectado', CONTA_CRIADA: 'Conta criada', CONTA_EDITADA: 'Conta editada',
+  CARTEIRA_CRIADA: 'Carteira criada', CARTEIRA_EDITADA: 'Carteira editada', SALDO_AJUSTADO: 'Saldo ajustado',
+  CATEGORIA_CRIADA: 'Categoria criada', CATEGORIA_EDITADA: 'Categoria editada', LIMITE_CRIADO: 'Limite criado',
+  LIMITE_EDITADO: 'Limite editado', CARTAO_CRIADO: 'Cartão criado', CARTAO_EDITADO: 'Cartão editado',
+  RECORRENCIA_CRIADA: 'Recorrência criada', RECORRENCIA_EDITADA: 'Recorrência editada',
+  OCORRENCIA_PULADA: 'Ocorrência pulada', OCORRENCIA_RETOMADA: 'Ocorrência retomada',
+  LANCAMENTO_VINCULADO: 'Lançamento vinculado', INVESTIMENTO_CRIADO: 'Investimento criado',
+  INVESTIMENTO_EDITADO: 'Investimento editado', MOVIMENTO_INVESTIMENTO: 'Movimento de investimento',
+  MOVIMENTO_INVESTIMENTO_EDITADO: 'Movimento de investimento editado',
 };
 
 export interface Attachment {
@@ -501,4 +516,133 @@ export interface ImportBatch {
   removed: number;
   items: ImportItemResult[];
   attachments: Attachment[];
+}
+
+// ------------------------------------------------------------------ investimentos
+
+export type InvestmentType = 'CAIXINHA' | 'CDB' | 'LCI' | 'LCA' | 'TESOURO' | 'POUPANCA' | 'DEBENTURE' | 'CRI_CRA'
+  | 'FUNDO' | 'PREVIDENCIA' | 'ACAO' | 'FII' | 'ETF' | 'BDR' | 'CRIPTO' | 'OUTRO';
+export type Indexer = 'CDI' | 'SELIC' | 'PRE' | 'IPCA' | 'POUPANCA' | 'MANUAL';
+export type MovementKind = 'APORTE' | 'RESGATE' | 'COMPRA' | 'VENDA' | 'PROVENTO' | 'ATUALIZACAO';
+
+export const INVESTMENT_TYPES: { key: InvestmentType; label: string; byQuantity: boolean; indexer: Indexer }[] = [
+  { key: 'CAIXINHA', label: 'Caixinha / conta remunerada', byQuantity: false, indexer: 'CDI' },
+  { key: 'CDB', label: 'CDB', byQuantity: false, indexer: 'CDI' },
+  { key: 'LCI', label: 'LCI', byQuantity: false, indexer: 'CDI' },
+  { key: 'LCA', label: 'LCA', byQuantity: false, indexer: 'CDI' },
+  { key: 'TESOURO', label: 'Tesouro Direto', byQuantity: false, indexer: 'SELIC' },
+  { key: 'POUPANCA', label: 'Poupança', byQuantity: false, indexer: 'POUPANCA' },
+  { key: 'DEBENTURE', label: 'Debênture', byQuantity: false, indexer: 'IPCA' },
+  { key: 'CRI_CRA', label: 'CRI / CRA', byQuantity: false, indexer: 'IPCA' },
+  { key: 'FUNDO', label: 'Fundo de investimento', byQuantity: false, indexer: 'MANUAL' },
+  { key: 'PREVIDENCIA', label: 'Previdência', byQuantity: false, indexer: 'MANUAL' },
+  { key: 'ACAO', label: 'Ação', byQuantity: true, indexer: 'MANUAL' },
+  { key: 'FII', label: 'Fundo imobiliário (FII)', byQuantity: true, indexer: 'MANUAL' },
+  { key: 'ETF', label: 'ETF', byQuantity: true, indexer: 'MANUAL' },
+  { key: 'BDR', label: 'BDR', byQuantity: true, indexer: 'MANUAL' },
+  { key: 'CRIPTO', label: 'Criptomoeda', byQuantity: true, indexer: 'MANUAL' },
+  { key: 'OUTRO', label: 'Outro', byQuantity: false, indexer: 'MANUAL' },
+];
+export const INVESTMENT_TYPE_LABEL = Object.fromEntries(INVESTMENT_TYPES.map(t => [t.key, t.label])) as Record<InvestmentType, string>;
+
+export const INDEXER_LABEL: Record<Indexer, string> = {
+  CDI: '% do CDI', SELIC: '% da Selic', PRE: 'Prefixado', IPCA: 'IPCA +', POUPANCA: 'Poupança', MANUAL: 'Manual',
+};
+
+export const MOVEMENT_LABEL: Record<MovementKind, string> = {
+  APORTE: 'Aporte', RESGATE: 'Resgate', COMPRA: 'Compra', VENDA: 'Venda', PROVENTO: 'Proventos',
+  ATUALIZACAO: 'Atualização',
+};
+
+export interface Investment {
+  id: string;
+  name: string;
+  type: InvestmentType;
+  ticker: string | null;
+  accountId: string | null;
+  accountName: string | null;
+  walletId: string | null;
+  walletName: string | null;
+  indexer: Indexer | null;
+  rate: number | null;
+  maturityDate: string | null;
+  color: string | null;
+  notes: string | null;
+  archived: boolean;
+  byQuantity: boolean;
+  /** Por valor: aportes − resgates. Por quantidade: custo da posição. */
+  invested: number;
+  currentValue: number;
+  gain: number;
+  gainPct: number | null;
+  quantity: number | null;
+  averagePrice: number | null;
+  lastPrice: number | null;
+  lastPriceDate: string | null;
+  realizedGain: number | null;
+  income: number;
+  lastUpdate: string | null;
+  ratesUntil: string | null;
+  movementCount: number;
+}
+
+export interface InvestmentRequest {
+  name: string;
+  type: InvestmentType;
+  ticker: string | null;
+  accountId: string | null;
+  walletId: string | null;
+  indexer: Indexer | null;
+  rate: number | null;
+  maturityDate: string | null;
+  color: string | null;
+  notes: string | null;
+  archived: boolean;
+}
+
+export interface Movement {
+  id: string;
+  investmentId: string;
+  kind: MovementKind;
+  date: string;
+  amount: number | null;
+  quantity: number | null;
+  unitPrice: number | null;
+  fees: number;
+  walletId: string | null;
+  walletName: string | null;
+  transactionId: string | null;
+  notes: string | null;
+  origin: 'WEB' | 'API';
+  createdAt: string;
+}
+
+export interface MovementRequest {
+  kind: MovementKind;
+  date: string;
+  amount: number | null;
+  quantity: number | null;
+  unitPrice: number | null;
+  fees: number | null;
+  walletId: string | null;
+  notes: string | null;
+  allowDuplicate: boolean;
+}
+
+export interface InvestmentDetail {
+  investment: Investment;
+  movements: Movement[];
+}
+
+export interface Portfolio {
+  invested: number;
+  currentValue: number;
+  gain: number;
+  income: number;
+  realizedGain: number;
+  fixedIncome: number;
+  variableIncome: number;
+  byType: { type: InvestmentType; value: number }[];
+  ratesUntil: string | null;
+  investments: Investment[];
 }

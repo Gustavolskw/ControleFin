@@ -84,6 +84,43 @@ informados).
 | GET | `/recurrences/{id}/occurrences/{AAAA-MM-DD}/candidates` | leitura | Lançamentos parecidos ainda sem vínculo (possível duplicado) |
 | PUT | `/transactions/{id}/recurrence` | escrita | Liga o lançamento a uma ocorrência (`recurrenceId`, `recurrenceDate`; nulos desligam) |
 
+### Investimentos
+
+Caixinhas, CDB, LCI/LCA, Tesouro, poupança, fundos e previdência são **por valor**: rendem pelo indexador, com o CDI,
+a Selic e o IPCA do Banco Central. Ações, FIIs, ETFs, BDRs e cripto são **por quantidade e preço**. Não há exclusão:
+arquive com `archived: true`.
+
+| Método | Rota | Permissão | O que faz |
+|---|---|---|---|
+| GET | `/investments` | leitura | Carteira: valor atual, investido, rendimento, proventos, renda fixa × variável e cada investimento |
+| GET | `/investments/{id}` | leitura | Investimento com todos os movimentos |
+| POST · PUT | `/investments` · `/investments/{id}` | escrita | Cria/edita (`name`, `type`, `ticker`, `indexer` CDI/SELIC/PRE/IPCA/POUPANCA/MANUAL, `rate`, `maturityDate`, `accountId`, `walletId`, `notes`, `archived`) |
+| POST | `/investments/{id}/movements` | escrita | Movimento (abaixo) |
+| PUT | `/investments/{id}/movements/{movementId}` | escrita | Corrige um movimento (o lançamento ligado na conta é refeito) |
+
+**Taxa (`rate`) conforme o indexador (`indexer`):**
+
+| Indexador | `rate` |
+|---|---|
+| CDI e SELIC | % do índice (`100` = 100% do CDI) |
+| PRE | % ao ano |
+| IPCA | taxa adicional, em % ao ano |
+| POUPANCA e MANUAL | não usa |
+
+**Movimentos** (`kind`):
+
+| `kind` | Campos | Na conta (com `walletId`) |
+|---|---|---|
+| `APORTE` / `RESGATE` | `amount` | sai como `APLICACAO` / volta como `RESGATE` (não são despesa/receita) |
+| `COMPRA` / `VENDA` | `quantity`, `unitPrice`, `fees` | sai quantidade × preço + taxas / volta quantidade × preço − taxas |
+| `PROVENTO` | `amount` | entra como `RECEITA` |
+| `ATUALIZACAO` | por valor: `amount` = saldo atual; por quantidade: `unitPrice` = cotação | não movimenta conta |
+
+- **Sem `walletId`:** só registra no investimento, sem mexer nas contas (por exemplo, o saldo que já existia).
+- **Duplicidade:** movimento igual (mesmo tipo e valor, até 3 dias) é recusado com 409, a não ser que venha `allowDuplicate: true`.
+- **Lançamentos ligados:** só mudam pelo próprio movimento.
+- **Data:** a data não pode ser futura.
+
 Tudo o que é criado ou editado fica em **Meu perfil → Atividade recente**, com o nome do token.
 
 ## `POST /imports`

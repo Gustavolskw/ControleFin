@@ -4,7 +4,8 @@ import { Observable } from 'rxjs';
 import { TokenResponse } from './auth.service';
 import {
   Account, AccountRequest, ActivityEntry, AdminUser, ApiToken, Attachment, ImportBatch, BankAccount, Card, CardRequest, Category, CategoryRequest, CreditLine,
-  CreditLineRequest, Dashboard, InviteInfo, InvoiceDetail, InvoiceSummary, NewInvite, QuestionAnswer, Recurrence,
+  CreditLineRequest, Dashboard, InvestmentDetail, InvestmentRequest, Investment, MovementRequest, Portfolio,
+  InviteInfo, InvoiceDetail, InvoiceSummary, NewInvite, QuestionAnswer, Recurrence,
   RecurrenceMonth, RecurrenceRequest, Transaction, TransactionFilter, TransactionKind, TransactionRequest,
   WalletRequest,
 } from './models';
@@ -272,5 +273,38 @@ export class ApiService {
 
   revokeInvite(id: string): Observable<void> {
     return this.http.delete<void>(`/api/admin/invites/${id}`);
+  }
+
+  // --- investimentos
+  portfolio(): Observable<Portfolio> {
+    return this.http.get<Portfolio>('/api/investments');
+  }
+
+  investment(id: string): Observable<InvestmentDetail> {
+    return this.http.get<InvestmentDetail>(`/api/investments/${id}`);
+  }
+
+  createInvestment(req: InvestmentRequest): Observable<Investment> {
+    return this.http.post<Investment>('/api/investments', req);
+  }
+
+  updateInvestment(id: string, req: InvestmentRequest): Observable<Investment> {
+    return this.http.put<Investment>(`/api/investments/${id}`, req);
+  }
+
+  deleteInvestment(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/investments/${id}`);
+  }
+
+  addMovement(investmentId: string, req: MovementRequest): Observable<InvestmentDetail> {
+    return this.http.post<InvestmentDetail>(`/api/investments/${investmentId}/movements`, req);
+  }
+
+  updateMovement(investmentId: string, movementId: string, req: MovementRequest): Observable<InvestmentDetail> {
+    return this.http.put<InvestmentDetail>(`/api/investments/${investmentId}/movements/${movementId}`, req);
+  }
+
+  deleteMovement(investmentId: string, movementId: string): Observable<InvestmentDetail> {
+    return this.http.delete<InvestmentDetail>(`/api/investments/${investmentId}/movements/${movementId}`);
   }
 }

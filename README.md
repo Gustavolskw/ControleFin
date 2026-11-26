@@ -2,8 +2,9 @@
 
 Controle financeiro pessoal e **privado**, com **conector para o Claude** (consultar e lançar pelo chat, inclusive no
 celular — veja [`docs/MCP.md`](docs/MCP.md)): contas bancárias com várias carteiras (ex.: Wiipo Livre e VA/VR), cartões
-físicos e digitais com limite compartilhado, faturas, parcelamentos, gastos recorrentes e importação de extratos e
-faturas pelo Claude (MCP).
+físicos e digitais com limite compartilhado, faturas, parcelamentos, gastos recorrentes, **investimentos** (caixinhas,
+CDB, Tesouro rendendo pelo CDI/IPCA do Banco Central; ações, FIIs e cripto por quantidade e preço) e importação de
+extratos e faturas pelo Claude (MCP).
 
 **Stack:** Java 21 + Spring Boot 4 (API) · Angular 19 (web) · PostgreSQL 17 · nginx (gateway) · Docker Compose ·
 Traefik (produção). Mesmo padrão de operação do Chama&Essencia.

@@ -115,7 +115,7 @@ import { Attachment, IMPORT_ITEM_LABEL, IMPORT_MODE_LABEL, ImportBatch, ImportIt
     .danger-text { color: var(--danger); }
     td .tag { margin-right: 4px; }
     .meta { display: none; }
-    @media (max-width: 700px) { .wide { display: none; } .meta { display: block; } }
+    @media (max-width: 700px) { th.wide, td.wide { display: none; } .meta { display: block; } }
   `,
 })
 export class ImportsComponent implements OnInit {
